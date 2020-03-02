@@ -1,7 +1,6 @@
 import sys, os
 import time
 import numpy as np
-import scipy.interpolate as si
 
 import utils as U
 
@@ -9,10 +8,10 @@ import utils as U
 def eval(params, model, 
          x_mean, x_std, y_mean, y_std, 
          x_min,  x_max, y_min,  y_max, scalelims, 
-         wavenum=None, wnfact=1, 
+         wavenum=None, 
          starspec=None, factor=1, 
-         filters=None, filt2um=1, 
-         conv=False, olog=False):
+         filters=None, ifilt=None, 
+         conv=False, ilog=False, olog=False):
     """
     Function to be evaluated for each MCMC iteration
     """
@@ -46,13 +45,15 @@ def eval(params, model,
 def eval_binned(params, model, 
                 x_mean, x_std, y_mean, y_std, 
                 x_min,  x_max, y_min,  y_max, scalelims, 
-                wavenum=None, wnfact=1, 
+                wavenum=None, 
                 starspec=None, factor=1, 
-                filters=None, filt2um=1, 
-                conv=False, olog=False):
+                filters=None, ifilt=None, 
+                conv=False, ilog=False, olog=False):
     """
     Evaluates the model for given inputs. Bins the output according to filters.
     """
+    if ilog:
+        params = np.log10(params)
     # Normalize & scale
     pars = U.scale(U.normalize(params, x_mean, x_std), 
                    x_min, x_max, scalelims)
@@ -74,28 +75,16 @@ def eval_binned(params, model,
         pred = 10**pred
     # Divide by stellar spectrum
     if starspec is not None:
-        pred = pred / starspecw
+        pred = pred / starspec
 
     # Multiply by any conversion factors, e.g., R_p/R_s, unit conversion
     pred *= factor
 
-    # Make sure `wavenum` is units of cm-1
-    wavenum *= wnfact
-
-    # Read the filters, resample to `wavenum`, integrate according to filter
+    # Band integrate according to filters
     nfilters = len(filters)
-    results  = np.zeros((params.shape[0], nfilters))
+    results  = np.zeros((pars.shape[0], nfilters))
     for i in range(nfilters):
-        datfilt = np.loadtxt(filters[i])
-        # Convert filter wavelenths to microns, then convert um -> cm-1
-        finterp = si.interp1d(10000. / (filt2um * datfilt[:,0]), 
-                              datfilt[:,1],
-                              bounds_error=False, fill_value=0)
-        # Interpolate and normalize
-        tranfilt = finterp(wavenum)
-        tranfilt = tranfilt / np.trapz(tranfilt, wavenum)
-        # Band integrate
-        results[:, i] = np.trapz(pred * tranfilt, wavenum, axis=-1)
+        results[:, i] = np.trapz(pred[:,ifilt[i,0]:ifilt[i,1]] * filters[i], wavenum[ifilt[i,0]:ifilt[i,1]], axis=-1)
 
     return results
 

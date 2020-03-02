@@ -4,16 +4,15 @@
 import sys, os
 import numpy as np
 import matplotlib as mpl
-#mpl.use("Agg")
 import matplotlib.pyplot as plt
+import scipy.special as sp
 
-#sys.path.append(os.path.dirname(os.path.realpath(__file__))+"/../lib")
-#import binarray as ba
 
-__all__ = ["trace", "pairwise", "histogram", "RMS"]#, "modelfit"]
+__all__ = ["trace", "pairwise", "histogram", "mcmc_pt", "PT_line", "xi"]
+
 
 def trace(allparams, title=None, parname=None, thinning=1,
-          fignum=-10, savefile=None, fmt=".", sep=None):
+          fignum=-10, savefile=None, fmt=".", sep=None, fs=14):
   """
   Plot parameter trace MCMC sampling
 
@@ -44,7 +43,6 @@ def trace(allparams, title=None, parname=None, thinning=1,
   """
   # Get number of parameters and length of chain:
   npars, niter = np.shape(allparams)
-  fs = 14
 
   # Set default parameter names:
   if parname is None:
@@ -93,7 +91,7 @@ def trace(allparams, title=None, parname=None, thinning=1,
 
 
 def pairwise(allparams, title=None, parname=None, thinning=1,
-             fignum=-11, savefile=None, style="hist"):
+             fignum=-11, savefile=None, style="hist", fs=14):
   """
   Plot parameter pairwise posterior distributions
 
@@ -134,7 +132,6 @@ def pairwise(allparams, title=None, parname=None, thinning=1,
     parname = np.zeros(npars, "<U%d"%namelen)
     for i in np.arange(npars):
       parname[i] = "P" + str(i).zfill(namelen-1)
-  fs = 14
 
   # Set palette color:
   palette = mpl.cm.get_cmap('YlOrRd', 256)
@@ -207,9 +204,9 @@ def pairwise(allparams, title=None, parname=None, thinning=1,
             ss = ax.get_subplotspec()
             nrows, ncols, start, stop = ss.get_geometry()
             if start//nrows == nrows-1:
-              ax.xaxis.set_label_coords(0.5, -1.3)
+              ax.xaxis.set_label_coords(0.5, -npars/20)
             if start%ncols == 0:
-              ax.yaxis.set_label_coords(-1.3, 0.5)
+              ax.yaxis.set_label_coords(-npars/20, 0.5)
       h += 1
   # The colorbar:
   if style == "hist":
@@ -315,158 +312,164 @@ def histogram(allparams, title=None, parname=None, thinning=1,
     plt.savefig(savefile)
 
 
-def RMS(binsz, rms, stderr, rmserr, cadence=None, binstep=1,
-        timepoints=[], ratio=False, fignum=-20,
-        yran=None, xran=None, savefile=None):
-  """
-  Plot the RMS vs binsize
+def mcmc_pt(outp, pressure, PTargs, 
+            savefile=None):
+    """
+    Computes the median, 1sigma from median, and 2sigma from median PT profiles.
+    """
+    # Calculate PT profiles
+    PTprofiles = np.zeros((np.shape(outp)[1], len(pressure)))
+    for i in np.arange(0, np.shape(outp)[1]):
+        PTparams      = np.concatenate((outp[:,i], PTargs))
+        PTprofiles[i] = PT_line(pressure, *PTparams)
 
-  Parameters
-  ----------
-  binsz: 1D ndarray
-     Array of bin sizes.
-  rms: 1D ndarray
-     RMS of dataset at given binsz.
-  stderr: 1D ndarray
-     Gaussian-noise rms Extrapolation
-  rmserr: 1D ndarray
-     RMS uncertainty
-  cadence: Float
-     Time between datapoints in seconds.
-  binstep: Integer
-     Plot every-binstep point.
-  timepoints: List
-     Plot a vertical line at each time-points.
-  ratio: Boolean
-     If True, plot rms/stderr, else, plot both curves.
-  fignum: Integer
-     Figure number
-  yran: 2-elements tuple
-     Minimum and Maximum y-axis ranges.
-  xran: 2-elements tuple
-     Minimum and Maximum x-axis ranges.
-  savefile: String
-     If not None, name of file to save the plot.
+    low1   = np.percentile(PTprofiles, 16.0, axis=0)
+    hi1    = np.percentile(PTprofiles, 84.0, axis=0)
+    low2   = np.percentile(PTprofiles,  2.5, axis=0)
+    hi2    = np.percentile(PTprofiles, 97.5, axis=0)
+    median = np.median(    PTprofiles,       axis=0)
 
-  Uncredited developers
+    # plot figure
+    plt.figure(2, dpi=300)
+    plt.clf()
+    ax1=plt.subplot(111)
+    ax1.fill_betweenx(pressure, low2, hi2, facecolor="#62B1FF", 
+                      label='2$\sigma$', edgecolor="0.5")
+    ax1.fill_betweenx(pressure, low1, hi1, facecolor="#1873CC",
+                      label='1$\sigma$', edgecolor="#1873CC")
+    plt.semilogy(median, pressure, "-", lw=2, label='Median',color="k")
+    plt.ylim(pressure[0], pressure[-1])
+    plt.legend(loc="best")
+    plt.xlabel("Temperature  (K)", size=15)
+    plt.ylabel("Pressure  (bar)",  size=15)
+    plt.gca().invert_yaxis()
+
+    # save figure
+    if savefile is not None:
+        plt.savefig(savefile)
+    plt.close()
+
+
+def PT_line(pressure, kappa,  gamma1, gamma2, alpha, beta, 
+            R_star,   T_star, T_int,  sma,    grav):
+  '''
+  Copied from BART/code/PT.py
+
+  Generates a PT profile based on input free parameters and pressure array.
+  If no inputs are provided, it will run in demo mode, using free
+  parameters given by the Line 2013 paper and some dummy pressure
+  parameters.
+  Inputs
+  ------
+  pressure: 1D float ndarray
+     Array of pressure values in bars.
+  kappa : float, in log10. Planck thermal IR opacity in units cm^2/gr
+  gamma1: float, in log10. Visible-to-thermal stream Planck mean opacity ratio.
+  gamma2: float, in log10. Visible-to-thermal stream Planck mean opacity ratio.
+  alpha : float.           Visible-stream partition (0.0--1.0).
+  beta  : float.           A 'catch-all' for albedo, emissivity, and day-night
+                           redistribution (on the order of unity)
+  R_star: Float
+     Stellar radius (in meters).
+  T_star: Float
+     Stellar effective temperature (in Kelvin degrees).
+  T_int:  Float
+     Planetary internal heat flux (in Kelvin degrees).
+  sma:    Float
+     Semi-major axis (in meters).
+  grav:   Float
+     Planetary surface gravity (at 1 bar) in cm/second^2.
+  Returns
+  -------
+  T: temperature array
+  Example:
+  --------
+  >>> import PT as pt
+  >>> import scipy.constants as sc
+  >>> import matplotlib.pyplot as plt
+  >>> import numpy as np
+  >>> Rsun = 6.995e8 # Sun radius in meters
+  >>> # Pressure array (bars):
+  >>> p = np.logspace(2, -5, 100)
+  >>> # Physical (fixed for each planet) parameters:
+  >>> Ts = 5040.0        # K
+  >>> Ti =  100.0        # K
+  >>> a  = 0.031 * sc.au # m
+  >>> Rs = 0.756 * Rsun  # m
+  >>> g  = 2192.8        # cm s-2
+  >>> # Fitting parameters:
+  >>> kappa  = -1.5   # log10(3e-2)
+  >>> gamma1 = -0.8   # log10(0.158)
+  >>> gamma2 = -0.8   # log10(0.158)
+  >>> alpha  = 0.5
+  >>> beta   = 1.0
+  >>> T0 = pt.PT(p, kappa, gamma1, gamma2, alpha, beta, Rs, Ts, Ti, a, g)
+  >>> plt.figure(1)
+  >>> plt.clf()
+  >>> plt.semilogy(T0, p, lw=2, color="b")
+  >>> plt.ylim(p[0], p[-1])
+  >>> plt.xlim(800, 2000)
+  >>> plt.xlabel("Temperature  (K)")
+  >>> plt.ylabel("Pressure  (bars)")
+  Developers:
+  -----------
+  Madison Stemm      astromaddie@gmail.com
+  Patricio Cubillos  pcubillos@fulbrightmail.org
+  Modification History:
   ---------------------
-  Kevin Stevenson  (UCF)
+  2014-09-12  Madison   Initial version, adapted from equations (13)-(16)
+                        in Line et al. (2013), Apj, 775, 137.
+  2014-12-10  patricio  Reviewed and updated code.
+  2015-01-22  patricio  Receive log10 of free parameters now.
+  2019-02-13  mhimes    Replaced `params` arg with each parameter for 
+                        consistency with other PT models
+  '''
+
+  # Convert kappa, gamma1, gamma2 from log10
+  kappa  = 10**(kappa )
+  gamma1 = 10**(gamma1)
+  gamma2 = 10**(gamma2)
+
+  # Stellar input temperature (at top of atmosphere):
+  T_irr = beta * (R_star / (2.0*sma))**0.5 * T_star
+
+  # Gray IR optical depth:
+  tau = kappa * (pressure*1e6) / grav # Convert bars to barye (CGS)
+
+  xi1 = xi(gamma1, tau)
+  xi2 = xi(gamma2, tau)
+
+  # Temperature profile (Eq. 13 of Line et al. 2013):
+  temperature = (0.75 * (T_int**4 * (2.0/3.0 + tau) +
+                         T_irr**4 * (1-alpha) * xi1 +
+                         T_irr**4 * alpha     * xi2 ) )**0.25
+
+  return temperature
+
+
+def xi(gamma, tau):
   """
+  Copied from BART/code/PT.py
 
-  if np.size(rms) <= 1:
-    return
-
-  # Set cadence:
-  if cadence is None:
-    cadence = 1.0
-    xlabel = "Bin size"
-  else:
-    xlabel = "Bin size  (sec)"
-
-  # Set plotting limits:
-  if yran is None:
-    #yran = np.amin(rms), np.amax(rms)
-    yran = [np.amin(rms-rmserr), np.amax(rms+rmserr)]
-    yran[0] = np.amin([yran[0],stderr[-1]])
-    if ratio:
-      yran = [0, np.amax(rms/stderr) + 1.0]
-  if xran is None:
-    xran = [cadence, np.amax(binsz*cadence)]
-
-  fs = 14 # Font size
-  if ratio:
-    ylabel = r"$\beta =$ RMS / std. error"
-  else:
-    ylabel = "RMS"
-
-  plt.figure(fignum, (8,6))
-  plt.clf()
-  ax = plt.subplot(111)
-
-  if ratio: # Plot the residuals-to-Gaussian RMS ratio:
-    a = plt.errorbar(binsz[::binstep]*cadence, (rms/stderr)[::binstep],
-                     (rmserr/stderr)[::binstep], fmt='k-', ecolor='0.5',
-                     capsize=0, label="__nolabel__")
-    a = plt.semilogx(xran, [1,1], "r-", lw=2)
-  else:     # Plot residuals and Gaussian RMS individually:
-    # Residuals RMS:
-    a = plt.errorbar(binsz[::binstep]*cadence, rms[::binstep],
-                     rmserr[::binstep], fmt='k-', ecolor='0.5',
-                     capsize=0, label="RMS")
-    # Gaussian noise projection:
-    a = plt.loglog(binsz*cadence, stderr, color='red', ls='-',
-                   lw=2, label="Gaussian std.")
-    a = plt.legend()
-  for time in timepoints:
-    a = plt.vlines(time, yran[0], yran[1], 'b', 'dashed', lw=2)
-
-  a = plt.yticks(size=fs)
-  a = plt.xticks(size=fs)
-  a = plt.ylim(yran)
-  a = plt.xlim(xran)
-  a = plt.ylabel(ylabel, fontsize=fs)
-  a = plt.xlabel(xlabel, fontsize=fs)
-
-  if savefile is not None:
-    plt.savefig(savefile)
-
-
-'''
-def modelfit(data, uncert, indparams, model, nbins=75, title=None,
-             fignum=-22, savefile=None):
+  Calculate Equation (14) of Line et al. (2013) Apj 775, 137
+  Parameters:
+  -----------
+  gamma: Float
+     Visible-to-thermal stream Planck mean opacity ratio.
+  tau: 1D float ndarray
+     Gray IR optical depth.
+  Modification History:
+  ---------------------
+  2014-12-10  patricio  Initial implemetation.
   """
-  Plot the model and (binned) data arrays, and their residuals.
+  return (2.0/3) * \
+         (1 + (1./gamma) * (1 + (0.5*gamma*tau-1)*np.exp(-gamma*tau)) +
+          gamma*(1 - 0.5*tau**2) * sp.expn(2, gamma*tau)              )
 
-  Parameters
-  ----------
-  data: 1D float ndarray
-     The data array.
-  uncert: 1D float ndarray
-     Uncertainties of the data-array values.
-  indparams: 1D float ndarray
-     X-axis values of the data-array values.
-  model: 1D ndarray
-     The model of data (evaluated at indparams values).
-  nbins: Integer
-     Output number of data binned values.
-  title: String
-     Plot title.
-  fignum: Integer
-     The figure number.
-  savefile: Boolean
-     If not None, name of file to save the plot.
-  """
 
-  # Bin down array:
-  binsize = (np.size(data)-1)/nbins + 1
-  bindata, binuncert, binindp = ba.binarray(data, uncert, indparams, binsize)
-  binmodel = ba.weightedbin(model, binsize)
-  fs = 14 # Font-size
 
-  p = plt.figure(fignum, figsize=(8,6))
-  p = plt.clf()
 
-  # Residuals:
-  a = plt.axes([0.15, 0.1, 0.8, 0.2])
-  p = plt.errorbar(binindp, bindata-binmodel, binuncert, fmt='ko', ms=4)
-  p = plt.plot([indparams[0], indparams[-1]], [0,0],'k:',lw=1.5)
-  p = plt.xticks(size=fs)
-  p = plt.yticks(size=fs)
-  p = plt.xlabel("x", size=fs)
-  p = plt.ylabel('Residuals', size=fs)
 
-  # Data and Model:
-  a = plt.axes([0.15, 0.35, 0.8, 0.55])
-  if title is not None:
-    p = plt.title(title, size=fs)
-  p = plt.errorbar(binindp, bindata, binuncert, fmt='ko', ms=4,
-                   label='Binned Data')
-  p = plt.plot(indparams, model, "b", lw=2, label='Best Fit')
-  p = plt.setp(a.get_xticklabels(), visible = False)
-  p = plt.yticks(size=13)
-  p = plt.ylabel('y', size=fs)
-  p = plt.legend(loc='best')
 
-  if savefile is not None:
-      p = plt.savefig(savefile)
-'''
+
+

@@ -8,6 +8,7 @@ import sys, os
 import configparser
 import importlib
 import numpy as np
+import scipy.interpolate as si
 
 import keras
 from keras import backend as K
@@ -16,8 +17,10 @@ libdir = os.path.dirname(__file__) + '/lib'
 sys.path.append(libdir)
 
 import NN
-import utils   as U
-import mcplots as P
+import compost    as C
+import credregion as CR
+import utils      as U
+import mcplots    as P
 
 mc3dir = os.path.dirname(__file__) + '/modules/MCcubed'
 sys.path.append(mc3dir)
@@ -52,9 +55,11 @@ def HOMER(cfile):
             conf = config[section]
             ### Unpack the variables ###
             # Top-level params
-            onlyplot  = conf.getboolean("onlyplot")
-            normalize = conf.getboolean("normalize")
-            scale     = conf.getboolean("scale")
+            onlyplot   = conf.getboolean("onlyplot")
+            credregion = conf.getboolean("credregion")
+            compost    = conf.getboolean("compost")
+            normalize  = conf.getboolean("normalize")
+            scale      = conf.getboolean("scale")
 
             # Directories
             inputdir  = os.path.join(os.path.abspath(conf["inputdir" ]), '')
@@ -104,37 +109,73 @@ def HOMER(cfile):
                     factor = np.load(inputdir + conf["factor"])
                 except:
                     factor = float(conf["factor"])
-            
+
+            if conf["factor"][-4:] == '.npy':
+                if os.path.isabs(conf["factor"]):
+                    factor = np.load(conf["factor"])
+                else:
+                    factor = np.load(inputdir + conf["factor"])
+            else:
+                try:
+                    factor = float(conf["factor"])
+                except:
+                    factor = 1.
+
+            if conf["PTargs"] == 'None' or conf["PTargs"] == '':
+                PTargs = []
+            else:
+                if   conf["PTargs"][-4:] == '.txt':
+                    if os.path.isabs(conf["PTargs"]):
+                        PTargs = np.loadtxt(conf["PTargs"])
+                    else:
+                        PTargs = np.loadtxt(inputdir + conf["PTargs"])
+                elif conf["PTargs"][-4:] == '.npy':
+                    if os.path.isabs(conf["PTargs"]):
+                        PTargs = np.load(conf["PTargs"])
+                    else:
+                        PTargs = np.load(inputdir + conf["PTargs"])
+                else:
+                    PTargs = [float(num) for num in conf["PTargs"].split()]
 
             if not os.path.isabs(conf["weight_file"]):
                 weight_file = inputdir + conf["weight_file"]
             else:
                 weight_file = conf["weight_file"]
-            inD         = conf.getint("input dim")
-            outD        = conf.getint("output dim")
-            olog        = conf.getboolean("olog")
-            xvals       = np.load(conf["xvals"])
-            wnfact      = float(conf["wnfact"])
-            xlabel      = conf["xval label"]
-            ylabel      = conf["yval label"]
-            fmean       = conf["fmean"]
-            fstdev      = conf["fstdev"]
-            fmin        = conf["fmin"]
-            fmax        = conf["fmax"]
+
+            inD    = conf.getint("input dim")
+            outD   = conf.getint("output dim")
+            ilog   = conf.getboolean("ilog")
+            olog   = conf.getboolean("olog")
+            xvals  = np.load(conf["xvals"])
+            wnfact = float(conf["wnfact"])
+            xlabel = conf["xval label"]
+            ylabel = conf["yval label"]
+            fmean  = conf["fmean"]
+            fstdev = conf["fstdev"]
+            fmin   = conf["fmin"]
+            fmax   = conf["fmax"]
+            fpress = conf["fpress"]
+
             convlayers     = conf["convlayers"]
-            if convlayers != "None":
-                convlayers =  [int(num) for num in convlayers.split()]
-                conv       = True
-            else:
+            if convlayers == "None" or convlayers == '':
                 convlayers = None
                 conv       = False
-            layers        =  [int(num) for num in conf["layers"].split()]
+            else:
+                convlayers =  [int(num) for num in convlayers.split()]
+                conv       = True
+
+            layers =  [int(num) for num in conf["layers"].split()]
 
             # Plotting parameters
             if conf['pnames'] == '':
                 pnames = None
             else:
                 pnames = conf['pnames'].split()
+            if conf['postshift'] == '' or conf['postshift'] == 'None':
+                postshift = None
+            else:
+                postshift = np.array([float(val) 
+                                      for val in conf['postshift'].split()])
             savefile = conf['savefile']
             if savefile != '':
                 savefile = savefile + '_'
@@ -147,6 +188,7 @@ def HOMER(cfile):
                     flog = outputdir + conf['flog']
             else:
                 flog = None
+
             func     = conf["func"].split()
             evalfunc = importlib.import_module(func[1]).__getattribute__(func[0])
             pinit    = np.array([float(val) for val in conf["pinit"].split()])
@@ -240,6 +282,24 @@ def HOMER(cfile):
                 print('Building model...')
                 nn = NN.NNModel(weight_file)
 
+                # Load filters
+                filttran = []
+                ifilt = np.zeros((len(filters), 2), dtype=int)
+                for i in range(len(filters)):
+                    datfilt = np.loadtxt(filters[i])
+                    # Convert filter wavelenths to microns, then convert um -> cm-1
+                    finterp = si.interp1d(10000. / (filt2um * datfilt[:,0]), 
+                                          datfilt[:,1],
+                                          bounds_error=False, fill_value=0)
+                    # Interpolate and normalize
+                    tranfilt = finterp(xvals)
+                    tranfilt = tranfilt / np.trapz(tranfilt, xvals)
+                    # Find non-zero indices for faster integration
+                    nonzero = np.where(tranfilt!=0)
+                    ifilt[i, 0] = max(nonzero[0][ 0] - 1, 0)
+                    ifilt[i, 1] = min(nonzero[0][-1] + 1, len(xvals)-1)
+                    filttran.append(tranfilt[ifilt[i,0]:ifilt[i,1]]) # Store filter
+
                 # Run the MCMC
                 if flog is not None:
                     logfile = open(flog, 'w')
@@ -252,10 +312,10 @@ def HOMER(cfile):
                                                      x_min, x_max, 
                                                      y_min, y_max, 
                                                      scalelims, 
-                                                     xvals, wnfact,
+                                                     xvals*wnfact,
                                                      starspec, factor, 
-                                                     filters, filt2um, 
-                                                     conv, olog],
+                                                     filttran, ifilt, 
+                                                     conv, ilog, olog],
                                           parnames=pnames, params=pinit, 
                                           pmin=pmin, pmax=pmax, stepsize=pstep,
                                           numit=niter, burnin=burnin, 
@@ -279,7 +339,12 @@ def HOMER(cfile):
                 for c in range(1, nchains):
                     outp = np.hstack((outp, outpc[c, :, burnin:]))
 
-            # Make plots
+            # Shift, if needed (e.g., for units)
+            if postshift is not None:
+                outp += np.expand_dims(postshift, -1)
+
+            # Make plots of posterior
+            print('\nMaking plots of the posterior...\n')
             P.trace(outp, parname=pnames, thinning=thinning, 
                     sep=np.size(outp[0]//nchains), 
                     savefile=outputdir+savefile+"MCMC_trace.png")
@@ -287,6 +352,84 @@ def HOMER(cfile):
                         savefile=outputdir+savefile+"MCMC_posterior.png")
             P.pairwise(outp, parname=pnames, thinning=thinning, 
                        savefile=outputdir+savefile+"MCMC_pairwise.png")
+
+            # PT profiles
+            pressure = np.loadtxt(inputdir + fpress, skiprows=1)[:,1]
+            P.mcmc_pt(outp[:5], pressure, PTargs, 
+                      savefile=outputdir+savefile+"MCMC_PT.png")
+
+            # Compute credible regions
+            parname = []
+            pnlen   = 0
+            for i in range(len(pnames)):
+                parname.append(pnames[i].replace('$', '').replace('\\', '').\
+                                         replace('_', '').replace('^' , ''))
+                pnlen = max(pnlen, len(parname[i]))
+
+            if credregion:
+                print('Calculating credible regions...\n')
+                fcred = open(outputdir + 'credregion.txt', 'w')
+                for n in range(outp.shape[0]):
+                    pdf, xpdf, CRlo, CRhi = CR.credregion(outp[n])
+                    creg = [' U '.join(['({:10.4e}, {:10.4e})'.format(
+                                        CRlo[j][k], CRhi[j][k])
+                                        for k in range(len(CRlo[j]))])
+                            for j in range(len(CRlo))]
+                    print(parname[n] + " credible region:")
+                    print("  68.27%: " + str(creg[0]))
+                    print("  95.45%: " + str(creg[1]))
+                    print("  99.73%: " + str(creg[2]))
+                    fcred.write(parname[n] + " credible region:")
+                    fcred.write("  68.27%: " + str(creg[0]))
+                    fcred.write("  95.45%: " + str(creg[1]))
+                    fcred.write("  99.73%: " + str(creg[2]))
+                fcred.close()
+
+            # Compare the posterior to another result
+            if compost:
+                print('\nMaking comparison plots of posteriors...')
+                compfile = conf["compfile"]
+                compname = conf["compname"]
+                if not os.path.isabs(conf["compsave"]):
+                    compsave = outputdir + conf["compsave"]
+                else:
+                    compsave = conf["compsave"]
+                if conf["compshift"] == '' or conf["compshift"] == 'None':
+                    compshift = None
+                else:
+                    compshift = np.array([float(val) 
+                                          for val in conf["compshift"].split()])
+                # Load posterior and stack chains
+                cpost  = np.load(compfile)
+                cstack = cpost[0, :, burnin:]
+                for c in np.arange(1, cpost.shape[0]):
+                    cstack = np.hstack((cstack, cpost[c, :, burnin:]))
+                if compshift is not None:
+                    cstack += np.expand_dims(compshift, -1)
+                # Make comparison plot
+                print('Plotting histograms of 1D posteriors...')
+                C.comp_histogram(outp, cstack, 
+                                 'HOMER', compname, 
+                                 pnames, 
+                                 savefile=compsave+'_hist.png')
+                print('Bhattacharyya coefficients:')
+                bhatchar = np.zeros(len(pnames))
+                for i in range(len(pnames)):
+                    rng   = min(outp[i].min(), cstack[i].min()), max(outp[i].max(), cstack[i].max())
+                    hist1 = np.histogram(outp[i],   density=False, bins=60, range=rng)[0]/outp[i].shape[0]
+                    hist2 = np.histogram(cstack[i], density=False, bins=60, range=rng)[0]/cstack[i].shape[0]
+                    bhatchar[i] = np.sum(np.sqrt(hist1 * hist2))
+                    print('  '+parname[i].ljust(pnlen, ' ')+': '+str(bhatchar[i]))
+                print('  '+'Mean'.ljust(pnlen, ' ')+':', np.mean(bhatchar))
+                np.save(outputdir+'bhatchar.npy', bhatchar)
+                print('Plotting PT profiles...')
+                C.comp_PT(pressure, outp[:5], cstack[:5], 'HOMER', compname, 
+                          PTargs, savefile=compsave+'_PT.png')
+                print('Plotting pairwise posteriors...')
+                C.comp_pairwise(outp, cstack, 
+                                 'HOMER', compname, 
+                                 pnames, 
+                                 savefile=compsave+'_pair.png')
 
     return
 

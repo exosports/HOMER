@@ -38,8 +38,7 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
          leastsq=True,    chisqscale=False, grtest=True,    grexit=False,
          burnin=0,        thinning=1,       fgamma=1.0,     fepsilon=0.0,
          plots=False,     savefile=None,    savemodel=None, comm=None,
-         resume=False,    log=None,         rms=False,      hsize=1, 
-         modelper=0):
+         resume=False,    log=None,         rms=False,      hsize=1):
   """
   This beautiful piece of code runs a Markov-chain Monte Carlo algoritm.
 
@@ -122,10 +121,6 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
      File object to write log into.
   hsize: Int
      Initial samples for snooker walk.
-  modelper: Int
-     Sets how to split `savemodel` into subfiles.
-     If 0, does not split. If >0, splits even `modelper` iterations.
-     E.g., if nchains=10 and modelper=5, splits every 50 model evaluations.
 
   Returns
   -------
@@ -235,13 +230,7 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
   outbounds  = np.zeros((nchains, nfree), np.int)    # Out of bounds proposals
   allparams  = np.zeros((nchains, nfree, chainsize)) # Parameter's record
   if savemodel is not None:
-    if modelper > 0:
-      nsaves   = int(np.ceil(chainsize / modelper)) # Number of files to save
-      nsaved   = 0 # Number of model files saved out so far
-      neval    = 0 # Number of models evaluated for current savemodel file
-      allmodel = np.zeros((nchains, ndata, modelper))  # Fit model
-    else:
-      allmodel = np.zeros((nchains, ndata, chainsize)) # Fit model
+    allmodel = np.zeros((nchains, ndata, chainsize)) # Fit model
 
   if resume:
     oldparams = np.load(savefile)
@@ -276,7 +265,7 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
   gamma = fgamma * 2.4 / np.sqrt(2*nfree)
 
   # Least-squares minimization:
-  if leastsq and walk!='unif':
+  if leastsq:
     fitargs = (params[0], func, data, uncert, indparams, stepsize, pmin, pmax,
                prior, priorlow, priorup)
     fitchisq, dummy = mf.modelfit(params[0,ifree], args=fitargs)
@@ -300,6 +289,7 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
     params[:, s] = params[:, -int(stepsize[s])-1]
 
   # Calculate chi-squared for model using current params:
+  models = np.zeros((nchains, ndata))
   if mpi:
     # Scatter (send) parameters to func:
     mu.comm_scatter(comm, params[:,0:mpars].flatten(), MPI.DOUBLE)
@@ -309,80 +299,79 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
     # Store them in models variable:
     models = np.reshape(mpimodels, (nchains, ndata))
   else:
-    fargs  = [params[:, 0:mpars]] + indparams  # List of function's arguments
-    models = func(*fargs)
+    fargs = [params[:, 0:mpars]] + indparams  # List of function's arguments
+    models[:] = func(*fargs)
 
-  if walk!='unif':
-    # Calculate chi-squared for each chain:
-    currchisq = np.zeros(nchains)
-    c2        = np.zeros(nchains)  # No-Jeffrey's chisq
+  # Calculate chi-squared for each chain:
+  currchisq = np.zeros(nchains)
+  c2        = np.zeros(nchains)  # No-Jeffrey's chisq
+  for c in np.arange(nchains):
+    if wlike: # Wavelet-based likelihood (chi-squared, actually)
+      currchisq[c], c2[c] = dwt.wlikelihood(params[c, mpars:], models[c]-data,
+                 (params[c]-prior)[iprior], priorlow[iprior], priorlow[iprior])
+    else:
+      currchisq[c], c2[c] = cs.chisq(models[c], data, uncert,
+                 (params[c]-prior)[iprior], priorlow[iprior], priorlow[iprior])
+
+  # Scale data-uncertainties such that reduced chisq = 1:
+  if chisqscale:
+    chifactor = np.sqrt(np.amin(currchisq)/(ndata-nfree))
+    uncert *= chifactor
+    # Re-calculate chisq with the new uncertainties:
     for c in np.arange(nchains):
       if wlike: # Wavelet-based likelihood (chi-squared, actually)
-        currchisq[c], c2[c] = dwt.wlikelihood(params[c, mpars:], models[c]-data,
-                   (params[c]-prior)[iprior], priorlow[iprior], priorlow[iprior])
+        currchisq[c], c2[c] = dwt.wlikelihood(params[c,mpars:], models[c]-data,
+                 (params[c]-prior)[iprior], priorlow[iprior], priorlow[iprior])
       else:
         currchisq[c], c2[c] = cs.chisq(models[c], data, uncert,
-                   (params[c]-prior)[iprior], priorlow[iprior], priorlow[iprior])
+                 (params[c]-prior)[iprior], priorlow[iprior], priorlow[iprior])
+    if leastsq:
+      fitchisq = currchisq[0]
 
-    # Scale data-uncertainties such that reduced chisq = 1:
-    if chisqscale:
-      chifactor = np.sqrt(np.amin(currchisq)/(ndata-nfree))
-      uncert *= chifactor
-      # Re-calculate chisq with the new uncertainties:
-      for c in np.arange(nchains):
-        if wlike: # Wavelet-based likelihood (chi-squared, actually)
-          currchisq[c], c2[c] = dwt.wlikelihood(params[c,mpars:], models[c]-data,
-                   (params[c]-prior)[iprior], priorlow[iprior], priorlow[iprior])
-        else:
-          currchisq[c], c2[c] = cs.chisq(models[c], data, uncert,
-                   (params[c]-prior)[iprior], priorlow[iprior], priorlow[iprior])
-      if leastsq:
-        fitchisq = currchisq[0]
+  # Snooker stuff - ter Braak & Vrugt 2008
+  if walk == "snooker":
+    # Initial number of samples
+    M0      = hsize * nchains
+    Zsize   = hsize
+    # Number of Z samples per chain
+    nZchain = int(np.ceil(numit / nchains / thinning))
+    # Number of iterations per chain
+    niter   = nZchain * thinning
+    # Total number of Z samples
+    Zlen    = M0 + nZchain * nchains
+    # Burned samples
+    Zburn   = int(burnin / thinning)
+    # Z array
+    Z       = np.zeros((hsize+nZchain, nchains, nparams), dtype=np.float64)
+    # Chi-squared for Z
+    Zchisq  = np.zeros((hsize+nZchain, nchains), dtype=np.float64)
+    Zc2     = np.zeros((hsize+nZchain, nchains), dtype=np.float64)
+    # Z models
+    Zmodels = np.zeros((hsize+nZchain, nchains, ndata), np.double)
 
-    # Snooker stuff - ter Braak & Vrugt 2008
-    if walk == "snooker":
-      # Initial number of samples
-      M0      = hsize * nchains
-      Zsize   = hsize
-      # Number of Z samples per chain
-      nZchain = int(np.ceil(numit / nchains / thinning))
-      # Number of iterations per chain
-      niter   = nZchain * thinning
-      # Total number of Z samples
-      Zlen    = M0 + nZchain * nchains
-      # Burned samples
-      Zburn   = int(burnin / thinning)
-      # Z array
-      Z       = np.zeros((hsize+nZchain, nchains, nparams), dtype=np.float64)
-      # Chi-squared for Z
-      Zchisq  = np.zeros((hsize+nZchain, nchains), dtype=np.float64)
-      Zc2     = np.zeros((hsize+nZchain, nchains), dtype=np.float64)
-      # Z models
-      Zmodels = np.zeros((hsize+nZchain, nchains, ndata), np.double)
+    # Populate Z array
+    Z[:, :, 0:mpars] = params[:, 0:mpars]
+    # Populate M0 samples in Z
+    for i in range(nfree):
+      ind = ifree[i]
+      Z[:hsize, :, ind] = np.random.uniform(pmin[ind], pmax[ind],
+                                         (hsize, nchains)        )
+    # Evaluate models for initial samples of Z
+    if mpi:
+      for i in range(hsize):
+        # Send params to func
+        mu.comm_scatter(comm, Z[i,:,0:mpars].flatten(), MPI.DOUBLE)
+        # Get evaluated models
+        mpiZmodels = np.zeros(nchains*ndata, np.double)
+        mu.comm_gather(comm, mpiZmodels)
+        # Store in `Zmodels`
+        Zmodels[i] = np.reshape(mpiZmodels, (nchains, ndata))
+    else:
+      fargs = [Z[i,:,:mpars]] + indparams
+      Zmodels[i,:] = func(*fargs)
 
-      # Populate Z array
-      Z[:, :, 0:mpars] = params[:, 0:mpars]
-      # Populate M0 samples in Z
-      for i in range(nfree):
-        ind = ifree[i]
-        Z[:hsize, :, ind] = np.random.uniform(pmin[ind], pmax[ind],
-                                           (hsize, nchains)        )
-      # Evaluate models for initial samples of Z if using MPI
-      if mpi:
-        for i in range(hsize):
-          # Send params to func
-          mu.comm_scatter(comm, Z[i,:,0:mpars].flatten(), MPI.DOUBLE)
-          # Get evaluated models
-          mpiZmodels = np.zeros(nchains*ndata, np.double)
-          mu.comm_gather(comm, mpiZmodels)
-          # Store in `Zmodels`
-          Zmodels[i] = np.reshape(mpiZmodels, (nchains, ndata))
-
-      # Evaluate chi squared, and model if not using MPI
+    # Evaluate chi squared
     for i in range(hsize):
-      if not mpi:
-        fargs      = [Z[i,:,:mpars]] + indparams
-        Zmodels[i] = func(*fargs)
       for c in range(nchains):
         # Chi squared
         if wlike:
@@ -393,23 +382,23 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
           Zchisq[i,c], Zc2[i,c] = cs.chisq(Zmodels[i,c], data, uncert,
                     (Z[i,c]-prior)[iprior], priorlow[iprior], priorlow[iprior])
 
-      # Current best Z
-      Zibest     = np.unravel_index(np.argmin(Zchisq[:hsize]),
-                                              Zchisq[:hsize].shape)
-      Zbestchisq = Zchisq[Zibest]
-      Zbestp     = np.copy(Z[Zibest])
-      Zbestmodel = np.copy(Zmodels[:hsize][Zibest])
+    # Current best Z
+    Zibest     = np.unravel_index(np.argmin(Zchisq[:hsize]),
+                                            Zchisq[:hsize].shape)
+    Zbestchisq = Zchisq[Zibest]
+    Zbestp     = np.copy(Z[Zibest])
+    Zbestmodel = np.copy(Zmodels[:hsize][Zibest])
 
-    # Get lowest chi-square and best fitting parameters:
-    bestchisq = np.amin(c2)
-    bestp     = np.copy(params[np.argmin(c2)])
-    bestmodel = np.copy(models[np.argmin(c2)])
+  # Get lowest chi-square and best fitting parameters:
+  bestchisq = np.amin(c2)
+  bestp     = np.copy(params[np.argmin(c2)])
+  bestmodel = np.copy(models[np.argmin(c2)])
 
-    if walk == "snooker":
-      if Zbestchisq < bestchisq:
-        bestchisq = Zbestchisq
-        bestp     = Zbestp
-        bestmodel = Zbestmodel
+  if walk == "snooker":
+    if Zbestchisq < bestchisq:
+      bestchisq = Zbestchisq
+      bestp     = Zbestp
+      bestmodel = Zbestmodel
 
   if savemodel is not None:
     allmodel[:,:,0] = models
@@ -440,10 +429,8 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
   ugamma = np.random.uniform(0, 1, (chainsize, nchains))
   gamma1 = np.tile(gamma, (nchains,1))
   # Use Uniform distribution to determine snooker jumps
-  if   walk == "snooker":
+  if walk == "snooker":
     sjump  = ugamma < 0.1
-  elif walk == 'unif':
-    unif   = np.zeros((chainsize, nchains))
 
   # Proposed iteration parameters and chi-square (per chain):
   nextp     = np.copy(params)    # Proposed parameters
@@ -504,10 +491,7 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
                         + fepsilon * support[i][~sjump[i]]
 
     # Propose next point:
-    if walk == 'unif':
-      nextp[:,ifree] = np.random.uniform(pmin[ifree], pmax[ifree], (nchains, nfree))
-    else:
-      nextp[:,ifree] = params[:,ifree] + jump
+    nextp[:,ifree] = params[:,ifree] + jump
 
     # Check it's within boundaries:
     outpars = np.asarray(((nextp < pmin) | (nextp > pmax))[:,ifree])
@@ -527,70 +511,48 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
       mu.comm_gather(comm, mpimodels)
       models = np.reshape(mpimodels, (nchains, ndata))
     else:
-      if len(np.where(~outflag)[0]) > 0:
-        fargs = [nextp[np.where(~outflag)[0], 0:mpars]] + indparams
-        models[np.where(~outflag)[0]] = func(*fargs)
+      iout = np.where(~outflag)[0]
+      if len(iout) > 0:
+        fargs = [nextp[iout, 0:mpars]] + indparams  # List of function's arguments
+        models[iout] = func(*fargs)
 
-    if walk!='unif':
-      # Calculate chisq:
-      for c in np.where(~outflag)[0]:
-        if wlike: # Wavelet-based likelihood (chi-squared, actually)
-          nextchisq[c], c2[c] = dwt.wlikelihood(nextp[c,mpars:], models[c]-data,
-                   (nextp[c]-prior)[iprior], priorlow[iprior], priorlow[iprior])
-        else:
-          nextchisq[c], c2[c] = cs.chisq(models[c], data, uncert,
-                   (nextp[c]-prior)[iprior], priorlow[iprior], priorlow[iprior])
+    # Calculate chisq:
+    for c in np.where(~outflag)[0]:
+      if wlike: # Wavelet-based likelihood (chi-squared, actually)
+        nextchisq[c], c2[c] = dwt.wlikelihood(nextp[c,mpars:], models[c]-data,
+                 (nextp[c]-prior)[iprior], priorlow[iprior], priorlow[iprior])
+      else:
+        nextchisq[c], c2[c] = cs.chisq(models[c], data, uncert,
+                 (nextp[c]-prior)[iprior], priorlow[iprior], priorlow[iprior])
 
-      # Reject out-of-bound jumps:
-      nextchisq[np.where(outflag)] = np.inf
-      # Evaluate which steps are accepted and update values:
-      mrfactor[:] = 1.0
-      if walk == "snooker" and np.any(sjump[i]):
-        mrfactor[sjump[i]] = \
-              (np.linalg.norm((nextp -z)[:,ifree][sjump[i]]) /
-               np.linalg.norm((params-z)[:,ifree][sjump[i]]) )**(nfree-1)
+    # Reject out-of-bound jumps:
+    nextchisq[np.where(outflag)] = np.inf
+    # Evaluate which steps are accepted and update values:
+    mrfactor[:] = 1.0
+    if walk == "snooker" and np.any(sjump[i]):
+      mrfactor[sjump[i]] = \
+            (np.linalg.norm((nextp -z)[:,ifree][sjump[i]]) /
+             np.linalg.norm((params-z)[:,ifree][sjump[i]]) )**(nfree-1)
 
-    if walk == 'unif':
-      accept = np.ones(nchains)
-    else:
-      accept = np.exp(0.5 * (currchisq - nextchisq)) * mrfactor
+    accept = np.exp(0.5 * (currchisq - nextchisq)) * mrfactor
     accepted = accept >= unif[i]
     if i >= burnin:
       numaccept += accepted
     # Update params and chi square:
     params   [accepted] = nextp    [accepted]
-    #currchisq[accepted] = nextchisq[accepted]
+    currchisq[accepted] = nextchisq[accepted]
 
-    if walk!='unif':
-      # Check lowest chi-square:
-      if np.amin(c2) < bestchisq:
-        bestp     = np.copy(params[np.argmin(c2)])
-        bestmodel = np.copy(models[np.argmin(c2)])
-        bestchisq = np.amin(c2)
-    else:
-      bestp     = np.copy(params[0])
-      bestchisq = 1.
+    # Check lowest chi-square:
+    if np.amin(c2) < bestchisq:
+      bestp     = np.copy(params[np.argmin(c2)])
+      bestmodel = np.copy(models[np.argmin(c2)])
+      bestchisq = np.amin(c2)
 
     # Store current iteration values:
     allparams[:,:,i+nold] = params[:, ifree]
     if savemodel is not None:
-      if modelper > 0:
-        models[~accepted] = allmodel[~accepted,:,neval-1]
-        if neval == modelper:
-          neval = 0 # Reset counter
-          # Save this set
-          np.save(savemodel.replace('.npy', 
-                                    str(nsaved).zfill(len(str(nsaves)))+'.npy'),
-                  allmodel)
-          nsaved += 1
-          # Reset array
-          allmodel = np.zeros((nchains, ndata, modelper))
-        # Store current iteration
-        allmodel[:,:,neval] = models
-        neval += 1
-      else:
-        models[~accepted]    = allmodel[~accepted,:,i+nold-1]
-        allmodel[:,:,i+nold] = models
+      models[~accepted] = allmodel[~accepted,:,i+nold-1]
+      allmodel[:,:,i+nold] = models
 
     # Update Z
     if walk == "snooker":
@@ -604,8 +566,8 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
     # Print intermediate info:
     if ((i+1) % intsteps == 0) and (i > 0):
       mu.progressbar((i+1.0)/chainsize, log)
-      mu.msg(1, "Out-of-bound Trials:\n {}".
-                 format(np.sum(outbounds, axis=0)), log)
+      mu.msg(1, "Out-of-bound Trials:\n {:s}".
+                 format(str(np.sum(outbounds, axis=0))), log)
       mu.msg(1, "Best Parameters:   (chisq={:.4f})\n{:s}".
                  format(bestchisq, str(bestp)), log)
 
@@ -629,7 +591,7 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
       # Save current results:
       if savefile is not None:
         np.save(savefile, allparams[:,:,0:i+nold])
-      if savemodel is not None and modelper < 1:
+      if savemodel is not None:
         np.save(savemodel, allmodel[:,:,0:i+nold])
 
   # Stack together the chains:
@@ -646,69 +608,68 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
   # Print out Summary:
   mu.msg(1, "\nFin, MCMC Summary:\n------------------", log)
 
-  if walk!='unif':
-    nsample   = (i+1-burnin)*nchains
-    ntotal    = np.size(allstack[0])
-    BIC       = bestchisq + nfree*np.log(ndata)
-    redchisq  = bestchisq/(ndata-nfree)
-    sdr       = np.std(bestmodel-data)
+  nsample   = (i+1-burnin)*nchains
+  ntotal    = np.size(allstack[0])
+  BIC       = bestchisq + nfree*np.log(ndata)
+  redchisq  = bestchisq/(ndata-nfree)
+  sdr       = np.std(bestmodel-data)
 
-    fmtlen = len(str(ntotal))
-    mu.msg(1, "Burned in iterations per chain: {:{}d}".
-               format(burnin,   fmtlen), log, 1)
-    mu.msg(1, "Number of iterations per chain: {:{}d}".
-               format(i+1, fmtlen), log, 1)
-    mu.msg(1, "MCMC sample size:               {:{}d}".
-               format(nsample,  fmtlen), log, 1)
-    mu.msg(resume, "Total MCMC sample size:         {:{}d}".
-               format(ntotal, fmtlen), log, 1)
-    mu.msg(1, "Acceptance rate:   {:.2f}%\n ".
-               format(np.sum(numaccept)*100.0/nsample), log, 1)
+  fmtlen = len(str(ntotal))
+  mu.msg(1, "Burned in iterations per chain: {:{}d}".
+             format(burnin,   fmtlen), log, 1)
+  mu.msg(1, "Number of iterations per chain: {:{}d}".
+             format(i+1, fmtlen), log, 1)
+  mu.msg(1, "MCMC sample size:               {:{}d}".
+             format(nsample,  fmtlen), log, 1)
+  mu.msg(resume, "Total MCMC sample size:         {:{}d}".
+             format(ntotal, fmtlen), log, 1)
+  mu.msg(1, "Acceptance rate:   {:.2f}%\n ".
+             format(np.sum(numaccept)*100.0/nsample), log, 1)
 
-    meanp   = np.mean(allstack, axis=1) # Parameters mean
-    uncertp = np.std(allstack,  axis=1) # Parameter standard deviation
-    mu.msg(1, "Best-fit params   Uncertainties        S/N      Sample "
-              "Mean   Note", log, 1)
-    for i in np.arange(nparams):
-      if i in ifree:    # Free-fitting value
-        unc  = "{:13.7e}". format(uncertp[np.where(ifree==i)][0])
-        snr  = "{:8.2f}".  format(np.abs(bestp[i])/uncertp[np.where(ifree==i)][0])
-        mean = "{: 14.7e}".format(meanp  [np.where(ifree==i)][0])
-        note = ""
-      elif i in ishare: # Shared value
-        j = int(-stepsize[i]-1)
-        unc  = "{:13.7e}". format(uncertp[np.where(ifree==j)][0])
-        snr  = "{:8.2f}".  format(np.abs(bestp[j])/uncertp[np.where(ifree==j)][0])
-        mean = "{: 14.7e}".format(meanp  [np.where(ifree==j)][0])
-        note = "Shared"
-      else:             # Fixed value
-        unc  = "0.0"
-        snr  = "---"
-        mean = "---"
-        note = "Fixed"
-      mu.msg(1, "{: 15.7e}   {:>13s}   {:>8s}   {:>14s}   {:s}".
-                 format(bestp[i], unc, snr, mean, note), log, 1)
+  meanp   = np.mean(allstack, axis=1) # Parameters mean
+  uncertp = np.std(allstack,  axis=1) # Parameter standard deviation
+  mu.msg(1, "Best-fit params   Uncertainties        S/N      Sample "
+            "Mean   Note", log, 1)
+  for i in np.arange(nparams):
+    if i in ifree:    # Free-fitting value
+      unc  = "{:13.7e}". format(uncertp[np.where(ifree==i)][0])
+      snr  = "{:8.2f}".  format(np.abs(bestp[i])/uncertp[np.where(ifree==i)][0])
+      mean = "{: 14.7e}".format(meanp  [np.where(ifree==i)][0])
+      note = ""
+    elif i in ishare: # Shared value
+      j = int(-stepsize[i]-1)
+      unc  = "{:13.7e}". format(uncertp[np.where(ifree==j)][0])
+      snr  = "{:8.2f}".  format(np.abs(bestp[j])/uncertp[np.where(ifree==j)][0])
+      mean = "{: 14.7e}".format(meanp  [np.where(ifree==j)][0])
+      note = "Shared"
+    else:             # Fixed value
+      unc  = "0.0"
+      snr  = "---"
+      mean = "---"
+      note = "Fixed"
+    mu.msg(1, "{: 15.7e}   {:>13s}   {:>8s}   {:>14s}   {:s}".
+               format(bestp[i], unc, snr, mean, note), log, 1)
 
-    if leastsq and np.any(np.abs((bestp[ifree]-fitbestp)/fitbestp) > 1e-08):
-      np.set_printoptions(precision=8)
-      mu.warning("MCMC found a better fit than the minimizer:\n"
-                 " MCMC best-fitting parameters:       (chisq={:.8g})\n  {:s}\n"
-                 " Minimizer best-fitting parameters:  (chisq={:.8g})\n"
-                 "  {:s}".format(bestchisq, str(bestp[ifree]),
-                                 fitchisq,  str(fitbestp)), log)
+  if leastsq and np.any(np.abs((bestp[ifree]-fitbestp)/fitbestp) > 1e-08):
+    np.set_printoptions(precision=8)
+    mu.warning("MCMC found a better fit than the minimizer:\n"
+               " MCMC best-fitting parameters:       (chisq={:.8g})\n  {:s}\n"
+               " Minimizer best-fitting parameters:  (chisq={:.8g})\n"
+               "  {:s}".format(bestchisq, str(bestp[ifree]),
+                               fitchisq,  str(fitbestp)), log)
 
-    fmtl = len("%.4f"%BIC)  # Length of string formatting
-    mu.msg(1, " ", log)
-    if chisqscale:
-      mu.msg(1, "sqrt(reduced chi-squared) factor: {:{}.4f}".
-                 format(chifactor, fmtl), log, 1)
-    mu.msg(1,   "Best-parameter's chi-squared:     {:{}.4f}".
-                 format(bestchisq, fmtl), log, 1)
-    mu.msg(1,   "Bayesian Information Criterion:   {:{}.4f}".
-                 format(BIC,       fmtl), log, 1)
-    mu.msg(1,   "Reduced chi-squared:              {:{}.4f}".
-                 format(redchisq,  fmtl), log, 1)
-    mu.msg(1,   "Standard deviation of residuals:  {:.6g}\n".format(sdr), log, 1)
+  fmtl = len("%.4f"%BIC)  # Length of string formatting
+  mu.msg(1, " ", log)
+  if chisqscale:
+    mu.msg(1, "sqrt(reduced chi-squared) factor: {:{}.4f}".
+               format(chifactor, fmtl), log, 1)
+  mu.msg(1,   "Best-parameter's chi-squared:     {:{}.4f}".
+               format(bestchisq, fmtl), log, 1)
+  mu.msg(1,   "Bayesian Information Criterion:   {:{}.4f}".
+               format(BIC,       fmtl), log, 1)
+  mu.msg(1,   "Reduced chi-squared:              {:{}.4f}".
+               format(redchisq,  fmtl), log, 1)
+  mu.msg(1,   "Standard deviation of residuals:  {:.6g}\n".format(sdr), log, 1)
 
 
   if rms:
@@ -746,11 +707,6 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
   if savefile is not None:
     np.save(savefile,  allparams[:,:,:chainlen])
   if savemodel is not None:
-    if modelper > 0 and nsaved < nsaves:
-      np.save(savemodel.replace('.npy', 
-                                str(nsaved).zfill(len(str(nsaves)))+'.npy'), 
-              allmodel)
-    else:
-      np.save(savemodel, allmodel [:,:,:chainlen])
+    np.save(savemodel, allmodel [:,:,:chainlen])
 
   return allstack, bestp
