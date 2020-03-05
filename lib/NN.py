@@ -1,3 +1,11 @@
+"""
+Contains functions related to the NN model.
+
+NNModel: loads the NN model.
+
+"""
+
+
 import sys, os
 import time
 import random

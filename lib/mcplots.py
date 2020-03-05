@@ -1,6 +1,22 @@
+"""
+Makes plots based on the MCMC posterior.  Adapted from MCcubed:
 # Copyright (c) 2015-2018 Patricio Cubillos and contributors.
 # MC3 is open-source software under the MIT license (see LICENSE).
 
+trace: plots histories of MCMC parameters.
+
+pairwise: plots the 2D pairwise posteriors for each combination of parameters.
+
+histogram: Plots the 1D marginalized posteriors for each parameter.
+
+mcmc_pt: Plots the temperature--pressure profiles explored by the MCMC.
+
+PT_line: computes the temperature--pressure profile according to 
+         Line et al. (2013)
+
+xi: used by PT_line to compute T(p) profile
+
+"""
 import sys, os
 import numpy as np
 import matplotlib as mpl

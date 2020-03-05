@@ -332,12 +332,28 @@ def HOMER(cfile):
                 # exploration
             else:
                 print('Remaking plots...')
-                # Load posterior, shape (nchains, nfree, niterperchain)
-                outpc = np.load(outputdir+savefile+'output.npy')
-                # Stack it to be (nfree, niter), remove burnin
-                outp = outpc[0, :, burnin:]
-                for c in range(1, nchains):
-                    outp = np.hstack((outp, outpc[c, :, burnin:]))
+            # Load posterior, shape (nchains, nfree, niterperchain)
+            outpc = np.load(outputdir+savefile+'output.npy')
+            if credregion:
+                print('Calculating effective sample size...\n')
+                fess = open(outputdir + 'ess.txt', 'w')
+                speis, totiter = CR.ess(outpc[:, :, burnin:])
+                print('SPEIS:', speis)
+                print('ESS  :', totiter//speis)
+                fess.write('SPEIS:' + str(speis))
+                fess.write('ESS  :' + str(totiter//speis))
+                p_est = np.array([0.68269, 0.95450, 0.99730])
+                siggy = CR.sig(totiter/speis, 
+                               p_est=p_est)
+                for i in range(len(p_est)):
+                    print('  ' + str(p_est[i]) + u"\u00B1" + str(siggy[i]))
+                    fess.write('  ' + str(p_est[i]) + u"\u00B1" + str(siggy[i]))
+                fess.close()
+
+            # Stack it to be (nfree, niter), remove burnin
+            outp = outpc[0, :, burnin:]
+            for c in range(1, nchains):
+                outp = np.hstack((outp, outpc[c, :, burnin:]))
 
             # Shift, if needed (e.g., for units)
             if postshift is not None:

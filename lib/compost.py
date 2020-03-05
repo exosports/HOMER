@@ -1,8 +1,14 @@
 """
 Module that contains functions to overplot posteriors.
 
-comp_histogram: Plots the normalized 1D marginalized posteriors for two MCMC 
-                runs.
+comp_histogram: Plots the probability density functions of 1D marginalized 
+                posteriors for two MCMC runs.
+
+comp_pt: Plots the explored temperature--pressure profiles for two MCMC runs.
+
+comp_pairwise: Plots the probability density functions of 2D pairwise 
+               posteriors for two MCMC runs.
+
 """
 
 import sys, os
@@ -17,7 +23,8 @@ def comp_histogram(stack1, stack2, name1, name2,
                    parname=None, 
                    fignum=-12, fs=26, savefile=None):
     """
-    Plots the normalized 1D marginalized posteriors for two MCMC runs.
+    Plots the probability density functions of 1D marginalized posteriors 
+    for two MCMC runs.
     
     Inputs
     ------
@@ -87,10 +94,25 @@ def comp_histogram(stack1, stack2, name1, name2,
 
 
 def comp_PT(pressure, stack1, stack2, name1, name2, 
-            PTargs, compshift=None,
-            fs=26, savefile=None):
+            PTargs, fs=26, savefile=None):
     """
+    Plots the median, 1sigma, and 2sigma regions for the temperature--pressure 
+    profiles explored for two MCMC runs.
     
+    Inputs
+    ------
+    pressure: array.  Pressures associated with each layer of the atmosphere.
+    stack1  : array.  Posterior, shaped (nparams, niterations)
+    stack2  : array.  Same as `stack1`, but for the posterior to be compared.
+    name1   : string. Label name for `stack1`
+    name2   : string. Label name for `stack2`
+    PTargs  : list.   Path to .txt file containing values necessary to 
+                      calculate the temperature--pressure profile.
+                      Currently, only option is Line et al. (2013) method.
+                      Format: R_star (meters), T_star (Kelvin), T_int (Kelvin),
+                              sma    (meters), grav (cm s-2)
+    fs      : int.    Font size for plots.
+    savefile: string. Path/to/file where the plot will be saved.
     """
     # Calculate PT profiles
     pt1 = np.zeros((np.shape(stack1)[1], len(pressure)))
@@ -143,9 +165,10 @@ def comp_PT(pressure, stack1, stack2, name1, name2,
 
 def comp_pairwise(stack1, stack2, name1, name2, 
                   parname=None, 
-                  fignum=-11, fs=16, savefile=None, style='hist'):
+                  fignum=-11, fs=16, savefile=None):
     """
-    Plots the normalized 1D marginalized posteriors for two MCMC runs.
+    Plots the probability density functions of 2D pairwise posteriors for two 
+    MCMC runs.
     
     Inputs
     ------
@@ -154,6 +177,7 @@ def comp_pairwise(stack1, stack2, name1, name2,
     name1   : string. Label name for `stack1`
     name2   : string. Label name for `stack2`
     parname : list, strings. Parameter names.
+    fignum  : int.    Figure number.
     fs      : int.    Font size for plots.
     savefile: string. Path/to/file where the plot will be saved.
     """

@@ -170,7 +170,7 @@ burnin      : int.  Number of burned iterations from the beginning of chains.
 nchains     : int.  Number of parallel samplers.
 thinning    : int.  Thinning factor for posterior.
 data        : floats. Values to be fit via MCMC. 
-                    Separate each value by an indented new line.
+                    Format: Separate each value by an indented new line.
 uncert      : floats. Uncertainties on values to be fit via MCMC. Same format.
 filters     : strs. Paths to filters associated with each datum. Same format.
 starspec    : str.  Path to .NPY file of the stellar spectrum.
@@ -182,8 +182,8 @@ filt2um     : float. Multiplication factor to convert the filter wavelengths
 PTargs      : str.  Path to .txt file containing values necessary to calculate 
                     the temperature--pressure profile.
                     Currently, only option is Line et al. (2013) method.
-                    Format: R_star (meters), T_star (Kelvin), T_int (Kelvin), 
-                            sma    (meters), grav (cm s-2)
+                    Format: R_star (m), T_star (K), T_int (K), 
+                            sma    (m), grav (cm s-2)
 
 
 Plotting Parameters
@@ -197,5 +197,21 @@ fpress     : str.  Path to text file containing the pressures of each layer of
                    the atmosphere, for plotting T(p) profiles.
                    If relative, with respect to input dir.
 savefile   : str.  Prefix for MCMC plots to be saved.
+
+
+Versions
+========
+HOMER was developed on a Unix/Linux machine using the following 
+versions of packages:
+ - Python 3.7.2
+ - GPyOpt 1.2.5
+ - Keras 2.2.4
+ - Numpy 1.16.2
+ - Matplotlib 3.0.2
+ - Scipy 1.2.1
+ - sklearn 0.20.2
+ - Tensorflow 1.13.1
+ - CUDA 9.1.85
+ - cuDNN 7.5.00
 
 

@@ -1,4 +1,4 @@
-name: plannet
+name: homer
 channels:
   - conda-forge
   - http://ssb.stsci.edu/astroconda
