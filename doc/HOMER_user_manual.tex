@@ -17,7 +17,7 @@
 
 % Title
 \rule{\linewidth}{0.5mm} \\[0.4cm]
-{ \huge \bfseries MARGE Users Manual \\[0.4cm] }
+{ \huge \bfseries HOMER Users Manual \\[0.4cm] }
 \rule{\linewidth}{0.5mm} \\[1.0cm]
 
 \textsc{\Large Helper Of My Eternal Retrievals}\\[1.5cm]
@@ -28,7 +28,7 @@
 \begin{flushleft}
 \large
 \emph{Authors:} \\
-Michael \textsc{Himes} \\
+Michael D. \textsc{Himes} \\
 \end{flushleft}
 \end{minipage}%
 \begin{minipage}{0.4\textwidth}
@@ -69,13 +69,14 @@ Multi-Core Markov Chain Monte Carlo (MC3) code to explore a parameter space
 and determine a posterior distribution of models consistent with the observed 
 data.
 
-\noindent The detailed HOMER code documentation and User Manual are provided 
+The detailed HOMER code documentation and User Manual are provided 
 with the package to assist users in its usage. For additional support, contact 
 the lead author (see Section \ref{sec:team}).
 
-\noindent HOMER is released under the Reproducible Research Software License.  
-For details, see 
-\url{https://planets.ucf.edu/resources/reproducible-research/software-license/}.
+HOMER is released under the Reproducible Research Software License.  
+For details, see \\
+\href{https://planets.ucf.edu/resources/reproducible-research/software-license/}{https://planets.ucf.edu/resources/reproducible-research/software-license/}.
+\newline
 
 \noindent The HOMER package is organized as follows: \newline
 % The framebox and minipage are necessary because dirtree kills the
@@ -215,17 +216,17 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
 \noindent The available options for a HOMER configuration file are listed below.
 
 \noindent \underline(Directories)
-\begin{enumerate}
+\begin{itemize}
 \item inputdir   : str.  Directory containing HOMER inputs.
 \item outputdir  : str.  Directory containing HOMER outputs.
-\end{enumerate}
+\end{itemize}
 
 \noindent \underline{Run Parameters}
-\begin{enumerate}
+\begin{itemize}
 \item onlyplot    : bool. Determines whether to skip the MCMC.
-                    Reproduces plots & calculations related to posterior.
+                    Reproduces plots \& calculations related to posterior.
 \item credregion  : bool. Determines whether to calculate the 68, 95, and 99\% 
-                    credible regions & uncertainties.
+                    credible regions \& uncertainties.
 \item compost     : bool. Determines whether to compare HOMER's posterior to 
                           another.
 \item compfile    : str.  Path to posterior to compare with HOMER.
@@ -236,11 +237,11 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
                           for unit conversions.
                     Format: val1 val2 val3 val4 ...
 \item postshift   : floats. Same as `compshift`, but for HOMER's posterior.
-\end{enumerate}
+\end{itemize}
 
 
 \noindent \underline{Data Normalization Parameters}
-\begin{enumerate}
+\begin{itemize}
 \item ilog        : bool. Determines whether the NN takes the logarithm of the 
                           inputs.
 \item olog        : bool. Determines whether the NN predicts the log of the 
@@ -258,26 +259,26 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
                           input directory.
 \item fstdev      : str.  Path to .NPY file of standard deviation of 
                           inputs/outputs.
-                          See `fmean` for format & path description.
+                          See `fmean` for format \& path description.
 \item fmin        : str.  Path to .NPY file of minima of inputs/outputs.
-                          See `fmean` for format & path description.
+                          See `fmean` for format \& path description.
 \item fmax        : str.  Path to .NPY file of maxima of inputs/outputs.
-                          See `fmean` for format & path description.
-\end{enumerate}
+                          See `fmean` for format \& path description.
+\end{itemize}
 
 
 \noindent \underline{Neural Network (NN) Parameters}
-\begin{enumerate}
-\item weight_file: str.  File containing NN model weights.
+\begin{itemize}
+\item weight\_file: str.  File containing NN model weights.
                    NOTE: MUST end in .h5
-\item input_dim  : int.  Dimensionality of the input  to the NN.
-\item output_dim : int.  Dimensionality of the output of the NN.
+\item input\_dim  : int.  Dimensionality of the input  to the NN.
+\item output\_dim : int.  Dimensionality of the output of the NN.
 \item convlayers : ints. Number of nodes for each convolutional layer.
 \item denselayers: ints. Number of nodes for each dense         layer.
-\end{enumerate}
+\end{itemize}
 
 \noindent \underline{MCMC Parameters}
-\begin{enumerate}
+\begin{itemize}
 \item flog        : str.  Path to MCMC log file. 
                           If relative, with respect to input dir.
 \item func        : strs. Function and file to evaluate at each iteration of 
@@ -313,23 +314,23 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
 \item PTargs      : str.  Path to .txt file containing values necessary to 
                           calculate the temperature--pressure profile.
                           Currently, only option is Line et al. (2013) method.
-                          Format: R_star (m), T_star (K), T_int (K), 
+                          Format: R\_star (m), T\_star (K), T\_int (K), 
                                   sma    (m), grav (cm s-2)
 
-\end{enumerate}
+\end{itemize}
 
 \noindent \underline{Plotting Parameters}
-\begin{enumerate}
+\begin{itemize}
 \item xvals      : str.  Path to .NPY file containing the x-axis values 
                          associated with a prediction.
                          If relative, path is with respect to `inputdir`.
-\item xval_label : str.  X-axis label for plots.
-\item yval_label : str.  Y-axis label for plots.
+\item xval\_label : str.  X-axis label for plots.
+\item yval\_label : str.  Y-axis label for plots.
 \item fpress     : str.  Path to text file containing the pressures of each 
                          layer of the atmosphere, for plotting T(p) profiles.
                          If relative, with respect to `inputdir`.
 \item savefile   : str.  Prefix for MCMC plots to be saved.
-\end{enumerate}
+\end{itemize}
 
 
 
@@ -338,7 +339,7 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
 
 HOMER produces the following outputs:
 
-\begin{enumerate}
+\begin{itemize}
 \item MCMC.log -- a record of the MCMC
 \item output.npy -- the posterior determined by the MCMC
 \item MCMC plots -- pairwise, posterior, PT, and trace plots.
@@ -350,7 +351,7 @@ HOMER produces the following outputs:
 \item bhatchar.npy -- if `compost`, calculates the Bhattacharyya coefficients 
                       between HOMER's posterior and the other specified 
                       posterior.
-\end{enumerate}
+\end{itemize}
 
 
 
@@ -359,9 +360,9 @@ HOMER produces the following outputs:
 Please cite this paper if you found this package useful for your
 research:
 
-\begin{enumerate}
+\begin{itemize}
 \item Himes et al. (2020), submitted to PSJ.
-\end{enumerate}
+\end{itemize}
 
 \begin{verbatim}
 @article{HimesEtal2020psjMARGEHOMER,
