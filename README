@@ -28,7 +28,11 @@ uncertainties, the posterior distribution is determined for some model.
 
 At present, HOMER uses MCcubed for its MCMC.  HOMER's forward model is a neural 
 network (NN) surrogate model trained by MARGE.  For details on MARGE, see the 
-MARGE User Manual.
+MARGE User Manual at http://planets.ucf.edu/bart-docs/MARGE_user_manual.pdf.
+
+HOMER comes with complete documentation as well as a user manual to assist 
+in its usage.  Users can find the HOMER User Manual at 
+http://planets.ucf.edu/bart-docs/HOMER_user_manual.pdf.
 
 HOMER is an open-source project that welcomes improvements from the community 
 to be submitted via pull requests on Github.  To be accepted, such improvements 
