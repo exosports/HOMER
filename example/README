@@ -1,0 +1,54 @@
+Introduction
+============
+
+This directory holds an example of how to run HOMER. It matches the use case 
+demonstrated in Himes et al. (2020).
+
+NOTE: Executing this example requires files from the MARGE example!
+      Run that first if you wish to run this example.
+
+********************************** IMPORTANT **********************************
+Recommended specs: Linux
+                   >= 1 core
+                   >= 4 GB RAM
+                   GPU with >= 12 GB RAM
+                   >= 1 GB free space
+
+If using an operating system that is not Linux-based, some aspects of the 
+example will likely need to be adjusted.  Users are encouraged to submit 
+updates to this example guide via pull requests if they find modifications are 
+necessary for certain operating systems.
+*******************************************************************************
+
+
+Walkthrough
+===========
+
+This section will walk the user through executing the example.
+
+Ensure that the repo's submodules have also been cloned.  
+When cloning HOMER, this can be done by
+  git clone --recursive https://github.com/exosports/HOMER HOMER/
+  cd MARGE/
+Alternatively, if HOMER has already been cloned, pull the submodules by 
+navigating to the HOMER directory and 
+  git submodule init
+  git submodule update
+
+Next, build MCcubed:
+  make mccubed
+
+Now, we are ready to begin.
+
+Navigate to the directory where the example files are at.
+  cd example
+If the user has copied these files to another location outside of HOMER, 
+navigate there instead.  The paths in some input files will need to be changed 
+by the user. 
+
+Execute HOMER:
+  ../HOMER.py example.cfg
+
+It will begin the retrieval, and should take < 1 hour.
+
+
