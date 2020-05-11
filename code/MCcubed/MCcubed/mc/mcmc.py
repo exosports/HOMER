@@ -383,9 +383,9 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
                     (Z[i,c]-prior)[iprior], priorlow[iprior], priorlow[iprior])
 
     # Current best Z
-    Zibest     = np.unravel_index(np.argmin(Zchisq[:hsize]),
-                                            Zchisq[:hsize].shape)
-    Zbestchisq = Zchisq[Zibest]
+    Zibest     = np.unravel_index(np.argmin(Zc2[:hsize]),
+                                            Zc2[:hsize].shape)
+    Zbestchisq = Zc2[Zibest]
     Zbestp     = np.copy(Z[Zibest])
     Zbestmodel = np.copy(Zmodels[:hsize][Zibest])
 
@@ -558,7 +558,8 @@ def mcmc(data,            uncert=None,      func=None,      indparams=[],
     if walk == "snooker":
       if i%thinning == 0:
         Z[hsize + i//thinning][:, ifree] = params[:, ifree]
-        Zchisq[hsize + i//thinning] = currchisq
+        Zchisq[hsize + i//thinning] = np.copy(currchisq)
+        Zc2   [hsize + i//thinning] = np.copy(c2)
         if savemodel:
           Zmodels[hsize + i//thinning] = np.copy(models)
         Zsize += 1

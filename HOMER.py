@@ -7,6 +7,7 @@ Driver for HOMER
 import sys, os
 import configparser
 import importlib
+import pickle
 import numpy as np
 import scipy.interpolate as si
 
@@ -17,6 +18,7 @@ libdir = os.path.dirname(__file__) + '/lib'
 sys.path.append(libdir)
 
 import NN
+import bestfit    as BF
 import compost    as C
 import credregion as CR
 import utils      as U
@@ -29,7 +31,9 @@ sys.path.append(mcdir)
 mcmcdir = os.path.dirname(__file__) + '/modules/MCcubed/MCcubed/mc'
 sys.path.append(mcmcdir)
 import MCcubed as mc3
-#import mc as mc3
+# NOTE: datasketches imported later, so that users are not forced to use it
+#       see just before the MCMC is called
+
 
 def HOMER(cfile):
     """
@@ -199,6 +203,10 @@ def HOMER(cfile):
             burnin   = conf.getint("burnin")
             nchains  = conf.getint("nchains")
             thinning = conf.getint("thinning")
+            try:
+                perc = np.array([float(val) for val in conf["perc"].split()])
+            except:
+                perc = np.array([0.6827, 0.9545, 0.9973])
 
             # Check sizes
             if np.any(np.array([len(pinit), len(pstep), 
@@ -277,28 +285,47 @@ def HOMER(cfile):
                 y_max     =  1.
                 scalelims = [0., 1.]
 
+            # Load filters
+            filttran = []
+            ifilt = np.zeros((len(filters), 2), dtype=int)
+            meanwn = []
+            for i in range(len(filters)):
+                datfilt = np.loadtxt(filters[i])
+                # Convert filter wavelenths to microns, then convert um -> cm-1
+                finterp = si.interp1d(10000. / (filt2um * datfilt[:,0]), 
+                                      datfilt[:,1],
+                                      bounds_error=False, fill_value=0)
+                # Interpolate and normalize
+                tranfilt = finterp(xvals)
+                tranfilt = tranfilt / np.trapz(tranfilt, xvals)
+                meanwn.append(np.sum(xvals*tranfilt)/sum(tranfilt))
+                # Find non-zero indices for faster integration
+                nonzero = np.where(tranfilt!=0)
+                ifilt[i, 0] = max(nonzero[0][ 0] - 1, 0)
+                ifilt[i, 1] = min(nonzero[0][-1] + 1, len(xvals)-1)
+                filttran.append(tranfilt[ifilt[i,0]:ifilt[i,1]]) # Store filter
+
+            meanwn = np.asarray(meanwn)
+
+            ### Check if datasketches is available ###
+            try:
+                from datasketches import kll_floatarray_sketches
+                print('Using the datasketches package to calculate ' + \
+                      'spectra quantiles.')
+                kll = kll_floatarray_sketches(10000, outD)
+            except:
+                print('datasketches package is not available.  Will ' + \
+                      'not calculate spectra quantiles.')
+                kll = None
+
+            # Save file names
+            fsavefile  = outputdir + savefile + 'output.npy'
+            fsavemodel = outputdir + savefile + 'output_model.npy'
+            fsavesks   = outputdir + 'sketches.pickle'
             if not onlyplot:
                 # Instantiate model
                 print('Building model...')
                 nn = NN.NNModel(weight_file)
-
-                # Load filters
-                filttran = []
-                ifilt = np.zeros((len(filters), 2), dtype=int)
-                for i in range(len(filters)):
-                    datfilt = np.loadtxt(filters[i])
-                    # Convert filter wavelenths to microns, then convert um -> cm-1
-                    finterp = si.interp1d(10000. / (filt2um * datfilt[:,0]), 
-                                          datfilt[:,1],
-                                          bounds_error=False, fill_value=0)
-                    # Interpolate and normalize
-                    tranfilt = finterp(xvals)
-                    tranfilt = tranfilt / np.trapz(tranfilt, xvals)
-                    # Find non-zero indices for faster integration
-                    nonzero = np.where(tranfilt!=0)
-                    ifilt[i, 0] = max(nonzero[0][ 0] - 1, 0)
-                    ifilt[i, 1] = min(nonzero[0][-1] + 1, len(xvals)-1)
-                    filttran.append(tranfilt[ifilt[i,0]:ifilt[i,1]]) # Store filter
 
                 # Run the MCMC
                 if flog is not None:
@@ -315,7 +342,7 @@ def HOMER(cfile):
                                                      xvals*wnfact,
                                                      starspec, factor, 
                                                      filttran, ifilt, 
-                                                     conv, ilog, olog],
+                                                     conv, ilog, olog, kll],
                                           parnames=pnames, params=pinit, 
                                           pmin=pmin, pmax=pmax, stepsize=pstep,
                                           numit=niter, burnin=burnin, 
@@ -323,31 +350,42 @@ def HOMER(cfile):
                                           walk='snooker', hsize=2*nchains, 
                                           plots=False, leastsq=False, 
                                           log=logfile, 
-                                          savefile=outputdir +             \
-                                                   savefile  + 'output.npy')
+                                          savefile =fsavefile,
+                                          savemodel=fsavemodel)
                 if flog is not None:
                     logfile.close()
                 # NOTE! hsize has the hard-coded value to ensure that the 
                 # parameter space is adequately seeded with models to speed up 
                 # exploration
+
+                # Serialize and save the sketches, in case needing to replot
+                if kll is not None:
+                    sers = kll.serialize()
+                    pickle.dump(sers, open(fsavesks, 'wb'))
             else:
                 print('Remaking plots...')
+                if kll is not None:
+                    try:
+                        desers = pickle.load(open(fsavesks, 'rb'))
+                        for i in range(len(desers)):
+                            kll.deserialize(desers[i], i)
+                    except:
+                        print("No sketch file found.  Will not plot quantiles.")
             # Load posterior, shape (nchains, nfree, niterperchain)
-            outpc = np.load(outputdir+savefile+'output.npy')
+            outpc = np.load(fsavefile)
             if credregion:
                 print('Calculating effective sample size...\n')
                 fess = open(outputdir + 'ess.txt', 'w')
-                speis, totiter = CR.ess(outpc[:, :, burnin:])
+                speis, ess = CR.ess(outpc[:, :, burnin:])
                 print('SPEIS:', speis)
-                print('ESS  :', totiter//speis)
+                print('ESS  :', ess)
                 fess.write('SPEIS:' + str(speis))
-                fess.write('ESS  :' + str(totiter//speis))
-                p_est = np.array([0.68269, 0.95450, 0.99730])
-                siggy = CR.sig(totiter/speis, 
-                               p_est=p_est)
-                for i in range(len(p_est)):
-                    print('  ' + str(p_est[i]) + u"\u00B1" + str(siggy[i]))
-                    fess.write('  ' + str(p_est[i]) + u"\u00B1" + str(siggy[i]))
+                fess.write('ESS  :' + str(ess))
+                siggy = CR.sig(ess, 
+                               p_est=perc)
+                for i in range(len(perc)):
+                    print('  ' + str(perc[i]) + u"\u00B1" + str(siggy[i]))
+                    fess.write('  ' + str(perc[i]) + u"\u00B1" + str(siggy[i]))
                 fess.close()
 
             # Stack it to be (nfree, niter), remove burnin
@@ -355,7 +393,17 @@ def HOMER(cfile):
             for c in range(1, nchains):
                 outp = np.hstack((outp, outpc[c, :, burnin:]))
 
-            # Shift, if needed (e.g., for units)
+            # Load the evaluated models & stack, excluding burnin
+            evalmodels = np.load(fsavemodel)
+            allmodel   = evalmodels[0,:,burnin:]
+            for c in range(1, nchains):
+                allmodel = np.hstack((allmodel, evalmodels[c, :, burnin:]))
+
+            # Plot best-fit model
+            bestfit = BF.get_bestfit(allmodel, outp, flog)
+            BF.plot_bestfit(outputdir, xvals, data, uncert, meanwn, ifilt, bestfit, kll)
+
+            # Shift posterior params, if needed (e.g., for units)
             if postshift is not None:
                 outp += np.expand_dims(postshift, -1)
 
@@ -374,31 +422,28 @@ def HOMER(cfile):
             P.mcmc_pt(outp[:5], pressure, PTargs, 
                       savefile=outputdir+savefile+"MCMC_PT.png")
 
-            # Compute credible regions
+            # Format parameter names, and find maximum length
             parname = []
             pnlen   = 0
             for i in range(len(pnames)):
                 parname.append(pnames[i].replace('$', '').replace('\\', '').\
                                          replace('_', '').replace('^' , ''))
                 pnlen = max(pnlen, len(parname[i]))
-
+            # Compute credible regions
             if credregion:
                 print('Calculating credible regions...\n')
                 fcred = open(outputdir + 'credregion.txt', 'w')
                 for n in range(outp.shape[0]):
-                    pdf, xpdf, CRlo, CRhi = CR.credregion(outp[n])
+                    pdf, xpdf, CRlo, CRhi = CR.credregion(outp[n], perc)
                     creg = [' U '.join(['({:10.4e}, {:10.4e})'.format(
                                         CRlo[j][k], CRhi[j][k])
                                         for k in range(len(CRlo[j]))])
                             for j in range(len(CRlo))]
                     print(parname[n] + " credible region:")
-                    print("  68.27%: " + str(creg[0]))
-                    print("  95.45%: " + str(creg[1]))
-                    print("  99.73%: " + str(creg[2]))
                     fcred.write(parname[n] + " credible region:")
-                    fcred.write("  68.27%: " + str(creg[0]))
-                    fcred.write("  95.45%: " + str(creg[1]))
-                    fcred.write("  99.73%: " + str(creg[2]))
+                    for p in range(len(perc)):
+                        print("  " + str(100*perc[p]) + "%: " + str(creg[p]))
+                        fcred.write("  " + str(100*perc[p]) + "%: " + str(creg[p]))
                 fcred.close()
 
             # Compare the posterior to another result

@@ -16,3 +16,8 @@ mccubed:
 	@echo "\nCompiling MCcubed..."
 	@cd ./modules/MCcubed && make
 	@echo "Finished compiling MCcubed.\n"
+
+datasketches:
+	@echo "Installing the datasketches package...\n"
+	@cd modules/incubator-datasketches-cpp && pip install .
+

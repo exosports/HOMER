@@ -67,7 +67,8 @@ lib/            - Contains the classes and functions of HOMER.
   utils.py      - Contains utiity functions.
 Makefile        - Handles setting up BART, and creating a TLI file.
 modules/        - Contains necessary modules for data generation.
-                  Initially empty; will contain MCcubed via the Makefile.
+                  Initially only contains the datsketches library; 
+                  will contain MCcubed via the Makefile.
 README          - This file!
 
 
@@ -80,7 +81,12 @@ Installation
 After recursively cloning the repo, users must modify some files of MCcubed 
 and compile.  Do so by entering
     make mccubed
-into a terminal.
+into the terminal.
+
+If the user wishes to compute median and 1-2-3sigma spectra, they will require 
+the datasketches package.  From the HOMER directory, enter
+    make datasketches
+into the terminal.  Note that this package is NOT required to run HOMER.
 
 
 Executing HOMER

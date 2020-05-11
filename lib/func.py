@@ -9,6 +9,7 @@ eval_binned: makes predictions on inputs, then integrates according to filters.
 
 import sys, os
 import time
+import multiprocessing as mp
 import numpy as np
 
 import utils as U
@@ -20,7 +21,7 @@ def eval(params, model,
          wavenum=None, 
          starspec=None, factor=1, 
          filters=None, ifilt=None, 
-         conv=False, ilog=False, olog=False):
+         conv=False, ilog=False, olog=False, kll=None):
     """
     Function to be evaluated for each MCMC iteration.
 
@@ -48,7 +49,7 @@ def eval(params, model,
     conv     : bool. True if convolutional layers are used.
     ilog     : bool. True if the NN input  is the log10 of the inputs.
     olog     : bool. True if the NN output is the log10 of the outputs.
-
+    kll      : object. Streaming quantiles calculator.
 
     Outputs
     -------
@@ -87,7 +88,7 @@ def eval_binned(params, model,
                 wavenum=None, 
                 starspec=None, factor=1, 
                 filters=None, ifilt=None, 
-                conv=False, ilog=False, olog=False):
+                conv=False, ilog=False, olog=False, kll=None):
     """
     Evaluates the model for given inputs. 
     Integrates the output according to filters.
@@ -114,7 +115,7 @@ def eval_binned(params, model,
     conv     : bool. True if convolutional layers are used.
     ilog     : bool. True if the NN input  is the log10 of the inputs.
     olog     : bool. True if the NN output is the log10 of the outputs.
-
+    kll      : object. Streaming quantiles calculator.
 
     Outputs
     -------
@@ -147,6 +148,10 @@ def eval_binned(params, model,
 
     # Multiply by any conversion factors, e.g., R_p/R_s, unit conversion
     pred *= factor
+
+    # Update the streaming quantiles
+    if kll is not None:
+        kll.update(pred)
 
     # Band integrate according to filters
     nfilters = len(filters)

@@ -121,6 +121,7 @@ versions of packages:
 \item Tensorflow 1.13.1
 \item CUDA 9.1.85
 \item cuDNN 7.5.00
+\item gcc 7.5.0
 \end{itemize}
 
 This conveniently matches the dependencies of MARGE.
@@ -164,7 +165,15 @@ conda env create -f environment.yml
 conda activate homer
 \end{verbatim}
 
-\noindent You are now ready to run HOMER.
+\noindent If the user wishes to compute median and 1-2-3sigma spectra, 
+the datasketches package is required.  Add this to the environment via
+\begin{verbatim}
+make datasketches
+\end{verbatim}
+\noindent from the HOMER directory. Note that this package is NOT required 
+to run HOMER, it is only required to calculate spectra quantiles.
+
+\noindent You are now ready to run HOMER!
 
 
 \section{Example}

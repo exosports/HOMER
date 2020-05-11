@@ -21,7 +21,7 @@ import mcplots as P
 
 def comp_histogram(stack1, stack2, name1, name2, 
                    parname=None, 
-                   fignum=-12, fs=26, savefile=None):
+                   fignum=-12, fs=30, savefile=None, bins=60):
     """
     Plots the probability density functions of 1D marginalized posteriors 
     for two MCMC runs.
@@ -35,6 +35,7 @@ def comp_histogram(stack1, stack2, name1, name2,
     parname : list, strings. Parameter names.
     fs      : int.    Font size for plots.
     savefile: string. Path/to/file where the plot will be saved.
+    bins    : int.    Number of bins for the histograms.
     """
     if np.shape(stack1)[0] != np.shape(stack2)[0]:
         raise ValueError('The posteriors must have the same ' + \
@@ -51,16 +52,17 @@ def comp_histogram(stack1, stack2, name1, name2,
 
     # Set number of rows:
     if npars < 10:
-        nrows = (npars - 1)/3 + 1
+        nperrow = 3
     else:
-        nrows = (npars - 1)/4 + 1
+        nperrow = 4
+    nrows = (npars - 1)//nperrow + 1
     # Set number of columns:
     if   npars > 9:
         ncolumns = 4
     elif npars > 4:
         ncolumns = 3
     else:
-        ncolumns = (npars+2)/3 + (npars+2)%3  # (Trust me!)
+        ncolumns = (npars+2)//3 + (npars+2)%3  # (Trust me!)
 
     histheight = 4 + 4*(nrows)
     if nrows == 1:
@@ -68,10 +70,10 @@ def comp_histogram(stack1, stack2, name1, name2,
     else:
         bottom = 0.15
 
-    plt.figure(fignum, figsize=(18, histheight))
+    fig = plt.figure(fignum, figsize=(18, histheight))
     plt.clf()
     plt.subplots_adjust(left=0.1, right=0.95, bottom=bottom, top=0.9,
-                        hspace=0.4, wspace=0.25)
+                        hspace=0.8, wspace=0.25)
 
     for i in np.arange(npars):
         ax = plt.subplot(nrows, ncolumns, i+1)
@@ -80,12 +82,13 @@ def comp_histogram(stack1, stack2, name1, name2,
         if i%ncolumns == 0:
             plt.ylabel('Normalized PDF', size=fs)
         plt.xlabel(parname[i], size=fs)
-        a = plt.hist(stack1[i], 60, alpha=0.5, label=name1, density=True, 
+        a = plt.hist(stack1[i], bins, alpha=0.5, label=name1, density=True, 
                      color='b')
-        a = plt.hist(stack2[i], 60, alpha=0.5, label=name2, density=True, 
+        a = plt.hist(stack2[i], bins, alpha=0.5, label=name2, density=True, 
                      color='r')
         if i == npars - 1:
             ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), prop={"size":fs})
+    fig.align_labels()
 
     if savefile is not None:
         plt.savefig(savefile, bbox_inches='tight')
@@ -124,17 +127,17 @@ def comp_PT(pressure, stack1, stack2, name1, name2,
         PTparams = np.concatenate((stack2[:,i], PTargs))
         pt2[i]   = P.PT_line(pressure, *PTparams)
 
-    lo1_1sig = np.percentile(pt1, 16.0, axis=0)
-    hi1_1sig = np.percentile(pt1, 84.0, axis=0)
-    lo1_2sig = np.percentile(pt1,  2.5, axis=0)
-    hi1_2sig = np.percentile(pt1, 97.5, axis=0)
-    med1     = np.median(    pt1,       axis=0)
+    lo1_1sig = np.percentile(pt1, 15.87, axis=0)
+    hi1_1sig = np.percentile(pt1, 84.13, axis=0)
+    lo1_2sig = np.percentile(pt1,  2.28, axis=0)
+    hi1_2sig = np.percentile(pt1, 97.72, axis=0)
+    med1     = np.median(    pt1,        axis=0)
 
-    lo2_1sig = np.percentile(pt2, 16.0, axis=0)
-    hi2_1sig = np.percentile(pt2, 84.0, axis=0)
-    lo2_2sig = np.percentile(pt2,  2.5, axis=0)
-    hi2_2sig = np.percentile(pt2, 97.5, axis=0)
-    med2     = np.median(    pt2,       axis=0)
+    lo2_1sig = np.percentile(pt2, 15.87, axis=0)
+    hi2_1sig = np.percentile(pt2, 84.13, axis=0)
+    lo2_2sig = np.percentile(pt2,  2.28, axis=0)
+    hi2_2sig = np.percentile(pt2, 97.72, axis=0)
+    med2     = np.median(    pt2,        axis=0)
 
     # plot figure
     plt.figure(2, dpi=300)
@@ -165,7 +168,7 @@ def comp_PT(pressure, stack1, stack2, name1, name2,
 
 def comp_pairwise(stack1, stack2, name1, name2, 
                   parname=None, 
-                  fignum=-11, fs=16, savefile=None):
+                  fignum=-11, fs=24, savefile=None):
     """
     Plots the probability density functions of 2D pairwise posteriors for two 
     MCMC runs.
@@ -283,18 +286,9 @@ def comp_pairwise(stack1, stack2, name1, name2,
                     a.set_yticks(a.get_yticks()[::3])
                 elif len(a.get_yticks()[::2]) > 2:
                     a.set_yticks(a.get_yticks()[::2])
-                # Align labels
-                if j == npars-1 and i == npars-1:
-                  axs = fig.get_axes()
-                  for ax in axs:
-                    ss = ax.get_subplotspec()
-                    nrows, ncols, start, stop = ss.get_geometry()
-                    if start//nrows == nrows-1:
-                      ax.xaxis.set_label_coords(0.5, -0.155 * npars)
-                    if start%ncols == 0:
-                      ax.yaxis.set_label_coords(-0.155 * npars, 0.5)
 
             h += 1
+    fig.align_labels()
     # The colorbar:
     if npars > 2:
         a = plt.subplot(2, 6, 5, frameon=False)
@@ -302,12 +296,12 @@ def comp_pairwise(stack1, stack2, name1, name2,
         a.xaxis.set_visible(False)
     bounds = np.linspace(0, 1.0, 64)
     norm   = mpl.colors.BoundaryNorm(bounds, palette1.N)
-    ax2    = fig.add_axes([0.8, 0.535, 0.025, 0.36])
+    ax2    = fig.add_axes([0.7, 0.45, 0.025, 0.36])
     cb     = mpl.colorbar.ColorbarBase(ax2, cmap=palette1, norm=norm,
                                        spacing='proportional', 
                                        boundaries=bounds, format='%.1f')
     cb.ax.set_yticklabels([])
-    ax2    = fig.add_axes([0.85, 0.535, 0.025, 0.36])
+    ax2    = fig.add_axes([0.75, 0.45, 0.025, 0.36])
     cb     = mpl.colorbar.ColorbarBase(ax2, cmap=palette2, norm=norm,
                                        spacing='proportional', 
                                        boundaries=bounds, format='%.1f')

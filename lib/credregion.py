@@ -202,7 +202,13 @@ def ess(allparams):
 
     Inputs
     ------
-    allparams: 2D array. Posterior distribution of shape (num_params, num_iter)
+    allparams: 3D array. Posterior distribution of shape 
+                         (num_chains, num_params, num_iter)
+
+    Outputs
+    -------
+    speis: int.   Number of steps per effective independent sample (SPEIS).
+    ess  : float. Effective sample size.
 
     Notes
     -----
@@ -229,8 +235,10 @@ def ess(allparams):
                 cutoff = len(adjsum)
             # Number of independent samples
             nisamp[nc, p] = 1 + 2 * np.sum(adjsum[:cutoff])
+
+    speis = int(np.ceil(np.amax(nisamp)))
     
-    return int(np.ceil(np.amax(nisamp))), totiter
+    return speis, totiter/speis
 
 
 
