@@ -100,18 +100,19 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwn, ifilt, bestfit, kll=Non
     plt.clf()
     ax = plt.subplot(111)
     if kll is not None:
-        ax.fill_between(xvals, lo3, hi3, facecolor="#C0DFFF", 
-                        edgecolor="#C0DFFF", label="3$\sigma$")
-        ax.fill_between(xvals, lo2, hi2, facecolor="#62B1FF", 
-                        edgecolor="#62B1FF", label="2$\sigma$")
-        ax.fill_between(xvals, lo1, hi1, facecolor="#1873CC", 
-                        edgecolor="#1873CC", label="1$\sigma$")
-        plt.plot(xvals, median, "b", label="Median")
+        ax.fill_between(xvals, lo3, hi3, facecolor="#d9ecff", 
+                        edgecolor="#d9ecff", label="3$\sigma$")
+        ax.fill_between(xvals, lo2, hi2, facecolor="#C0DFFF", #62B1FF
+                        edgecolor="#C0DFFF", label="2$\sigma$")
+        ax.fill_between(xvals, lo1, hi1, facecolor="cornflowerblue", #1873CC
+                        edgecolor="cornflowerblue", label="1$\sigma$")
+        plt.plot(xvals, median, "royalblue", label="Median")
     plt.scatter(meanwn, bestfit*1e3, c="k", label="Best fit", zorder=30, 
-                lw=0.7)
+                lw=1, s=16)
     plt.errorbar(meanwn, data*1e3, 
                  yerr=uncert*1e3, xerr=np.abs(xvals[ifilt].T - meanwn), 
-                 fmt="or", markersize=4, label="Data", zorder=20)
+                 fmt="or", markersize=3, capsize=2, elinewidth=1, 
+                 ecolor='tab:red', label="Data", zorder=20)
     plt.legend(loc='best')
     ax.set_xlim(np.amin(xvals), np.amax(xvals))
     ax.set_ylabel(r"$F_p/F_s$ (10$^{-3}$)")
