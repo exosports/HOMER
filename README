@@ -51,18 +51,17 @@ Files & Directories
 ===================
 HOMER contains various files and directories, described here.
 
-code/           - Contains modifications to MCcubed files.
 doc/            - Contains documentation for HOMER.  The User Manual contains 
-                  the information in the README, as well as a walkthrough for 
-                  setup and running an example.
+                  the information in the README with more detail, as well as a 
+                  walkthrough for setup and running an example.
 environment.yml - Contains all required packages (w/ versions) for HOMER.
-example/        - Contains example configuration files for HOMER.
+example/        - Contains example of executing HOMER.
 HOMER.py        - The executable driver for HOMER. Accepts a configuration file.
 lib/            - Contains the classes and functions of HOMER.
+  bestfit.py    - Contains functions to plot the best-fit spectrum.
   compost.py    - Contains functions to compare posterior distributions.
-  credregion.py - Contains functions related to calculating credible regions.
   func.py       - Contains functions to be evaluated by the MCMC.
-  mcplots.py    - Contains functions to plot results of the MCMC.
+  mcmcplots.py  - Contains functions to plot results of the MCMC.
   NN.py         - Contains a function to load a MARGE NN model.
   utils.py      - Contains utiity functions.
 Makefile        - Handles setting up BART, and creating a TLI file.
@@ -78,8 +77,8 @@ for more details.
 
 Installation
 ============
-After recursively cloning the repo, users must modify some files of MCcubed 
-and compile.  Do so by entering
+After recursively cloning the repo, users must compile MCcubed. 
+Do so by entering
     make mccubed
 into the terminal.
 
@@ -87,6 +86,9 @@ If the user wishes to compute median and 1-2-3sigma spectra, they will require
 the datasketches package.  From the HOMER directory, enter
     make datasketches
 into the terminal.  Note that this package is NOT required to run HOMER.
+
+To install both packages easily, do
+    make all
 
 
 Executing HOMER
@@ -96,7 +98,7 @@ HOMER configuration file, run HOMER via
     ./HOMER.py <path/to/configuration file>
 
 Note that HOMER requires a trained MARGE model.  For details, see the MARGE 
-User Manual.
+User Manual (http://planets.ucf.edu/bart-docs/MARGE_user_manual.pdf).
 
 
 Setting Up a HOMER Configuration File
@@ -108,105 +110,121 @@ associated README with instructions on execution.
 
 Directories
 -----------
-inputdir   : str.  Directory containing HOMER inputs.
-outputdir  : str.  Directory containing HOMER outputs.
+inputdir  : str.  Directory containing HOMER inputs.
+outputdir : str.  Directory containing HOMER outputs.
 
 
 Run Parameters
 --------------
+quantiles   : bool. Determines whether to compute spectra quantiles.
+                    If the Datasketches library is not install, this setting 
+                    has no effect.
 onlyplot    : bool. Determines whether to skip the MCMC.
-                    Reproduces plots & calculations related to posterior.
-credregion  : bool. Determines whether to calculate the 68, 95, and 99% 
-                    credible regions & uncertainties.
-compost     : bool. Determines whether to compare HOMER's posterior to another.
+                    Reproduces plots \& calculations related to posterior.
+plot_PT     : bool. Determines whether to compute the explored 
+                    pressure--temperature profiles using the formulation of 
+                    Line et al. (2013)
+credregion  : bool. Determines whether to calculate the 68, 95, and 99\% 
+                    credible regions \& uncertainties.
+compost     : bool. Determines whether to compare HOMER's posterior to 
+                    another.
 compfile    : str.  Path to posterior to compare with HOMER.
 compname    : str.  Name of the other posterior for plot legends.
 compsave    : str.  File name prefix for the saved comparison plots.
-compshift   : floats. Shifts all values of a particular parameter by a set 
-                    amount in the posterior to be compared, such as for unit 
-                    conversions.
+compshift   : floats. Shifts all values of a particular parameter by a 
+                    set amount in the posterior to be compared, such as 
+                    for unit conversions.
                     Format: val1 val2 val3 val4 ...
 postshift   : floats. Same as `compshift`, but for HOMER's posterior.
 
 
 Data Normalization Parameters
 -----------------------------
-ilog        : bool. Determines whether the NN takes the logarithm of the inputs.
-olog        : bool. Determines whether the NN predicts the log of the outputs.
-normalize   : bool. Determines whether to standardize the data by its mean and 
-                    standard deviation.
-scale       : bool. Determines whether to scale the data to be within a range.
+ilog        : bool. Determines whether the NN takes the logarithm of the 
+                    inputs.
+olog        : bool. Determines whether the NN predicts the log of the 
+                    outputs.
+normalize   : bool. Determines whether to standardize the data by its 
+                    mean and standard deviation.
+scale       : bool. Determines whether to scale the data to be within a 
+                    range.
 scalelims   : ints. Range to scale the data to.
                     Format: low, high
-fmean       : str.  Path to .NPY file of mean training input and output values.
-                    Format: [inp0, inp1, inp2, ..., outp0, outp1, outp2, ...]
-                    If relative path, assumed to be with respect to the input 
-                    directory.
-fstdev      : str.  Path to .NPY file of standard deviation of inputs/outputs.
-                    See `fmean` for format & path description.
+fmean       : str.  Path to .NPY file of mean training input and output 
+                    values.
+                    Format: [inp0, inp1, ..., outp0, outp1, ...]
+                    If relative path, assumed to be with respect to the 
+                    input directory.
+fstdev      : str.  Path to .NPY file of standard deviation of 
+                    inputs/outputs.
+                    See `fmean` for format \& path description.
 fmin        : str.  Path to .NPY file of minima of inputs/outputs.
-                    See `fmean` for format & path description.
+                    See `fmean` for format \& path description.
 fmax        : str.  Path to .NPY file of maxima of inputs/outputs.
-                    See `fmean` for format & path description.
+                    See `fmean` for format \& path description.
 
 
 Neural Network (NN) Parameters
 ------------------------------
-weight_file: str.  File containing NN model weights.
-                   NOTE: MUST end in .h5
-input_dim  : int.  Dimensionality of the input  to the NN.
-output_dim : int.  Dimensionality of the output of the NN.
-
-convlayers : ints. Number of nodes for each convolutional layer.
-denselayers: ints. Number of nodes for each dense         layer.
+weight_file: str. File containing NN model & weights.
+                  NOTE: MUST end in .h5
+input_dim  : int. Dimensionality of the input  to the NN.
+output_dim : int. Dimensionality of the output of the NN.
 
 
 MCMC Parameters
 ---------------
 flog        : str.  Path to MCMC log file. 
                     If relative, with respect to input dir.
-func        : strs. Function and file to evaluate at each iteration of the MCMC.
+func        : strs. Function and file to evaluate at each iteration of 
+                    the MCMC.
                     Format: function file
                     Note: omit the '.py' from `file`.
-pnames      : strs. Name of each free parameter. Can include LaTeX formatting.
+pnames      : strs. Name of each free parameter. Can include LaTeX 
+                    formatting.
 pinit       : floats. Initial parameters for the MCMC.
 pmin        : floats. Minima for free parameters.
 pmax        : floats. Maxima for free parameters.
 pstep       : floats. Step size for free parameters. 
-                    This will change throughout the MCMC due to the differential
-                    evolution algorithm used.
+                      This will change throughout the MCMC due to the 
+                      differential evolution algorithm used.
 niter       : int.  Number of total iterations.
-burnin      : int.  Number of burned iterations from the beginning of chains.
+burnin      : int.  Number of burned iterations from the beginning of 
+                    chains.
 nchains     : int.  Number of parallel samplers.
 thinning    : int.  Thinning factor for posterior.
 data        : floats. Values to be fit via MCMC. 
-                    Format: Separate each value by an indented new line.
-uncert      : floats. Uncertainties on values to be fit via MCMC. Same format.
-filters     : strs. Paths to filters associated with each datum. Same format.
+                    Format: Separate each value by an indented newline.
+                    Alternatively, specify a .NPY file.
+uncert      : floats. Uncertainties on values to be fit via MCMC. 
+                      Same format (indented newlines or .NPY)
+filters     : strs. Paths to filters associated with each datum. 
+                    Same format (indented newlines only)
 starspec    : str.  Path to .NPY file of the stellar spectrum.
-factor      : str.  Path to .NPY file of multiplication factor by which to 
-                    modify de-normalized predictions. E.g., unit conversion.
+factor      : str.  Path to .NPY file of multiplication factor by which 
+                    to modify de-normalized predictions. 
+                    E.g., unit conversion.
 wnfact      : float. Multiplication factor to convert `xvals` to cm-1.
-filt2um     : float. Multiplication factor to convert the filter wavelengths 
-                    to microns.
-PTargs      : str.  Path to .txt file containing values necessary to calculate 
-                    the temperature--pressure profile.
+filt2um     : float. Multiplication factor to convert the filter 
+                     wavelengths to microns.
+PTargs      : str.  Path to .txt file containing values necessary to 
+                    calculate the temperature--pressure profile.
                     Currently, only option is Line et al. (2013) method.
                     Format: R_star (m), T_star (K), T_int (K), 
-                            sma    (m), grav (cm s-2)
+                            sma (m), grav (cm s-2)
 
 
 Plotting Parameters
 -------------------
-xvals      : str.  Path to .NPY file containing the x-axis values associated 
-                   with a prediction.
-                   If relative, path is with respect to the input directory.
-xval_label : str.  X-axis label for plots.
-yval_label : str.  Y-axis label for plots.
-fpress     : str.  Path to text file containing the pressures of each layer of 
-                   the atmosphere, for plotting T(p) profiles.
-                   If relative, with respect to input dir.
-savefile   : str.  Prefix for MCMC plots to be saved.
+xvals      : str.  Path to .NPY file containing the x-axis values 
+                   associated with a prediction.
+                   If relative, path is with respect to `inputdir`.
+xlabel     : str.  X-axis label for plots.
+ylabel     : str.  Y-axis label for plots.
+fpress     : str.  Path to text file containing the pressures of each 
+                   layer of the atmosphere, for plotting T(p) profiles.
+                   If relative, with respect to `inputdir`.
+savefile   : str.  (optional) Prefix for MCMC plots to be saved.
 
 
 Versions
@@ -214,14 +232,37 @@ Versions
 HOMER was developed on a Unix/Linux machine using the following 
 versions of packages:
  - Python 3.7.2
- - GPyOpt 1.2.5
  - Keras 2.2.4
  - Numpy 1.16.2
  - Matplotlib 3.0.2
+ - mpi4py 3.0.3
  - Scipy 1.2.1
  - sklearn 0.20.2
  - Tensorflow 1.13.1
  - CUDA 9.1.85
  - cuDNN 7.5.00
+ - ONNX 1.6.0
+ - keras2onnx 1.6.1
+ - onnx2keras 0.0.18
 
+
+Be kind
+=======
+Please cite this paper if you found this package useful for your research:
+
+Himes et al. (2020), submitted to PSJ.
+
+@article{HimesEtal2020psjMARGEHOMER,
+   author = {{Himes}, Michael D. and {Harrington}, Joseph and {Cobb}, Adam D. 
+             and {G{\"u}ne{\textcommabelow s} Baydin}, At{\i}l{\i}m and 
+             {Soboczenski}, Frank and {O'Beirne}, Molly D. and {Zorzan}, Simone 
+             and {Wright}, David C. and {Scheffer}, Zacchaeus and 
+             {Domagal-Goldman}, Shawn D. and {Arney}, Giada N.},
+    title = "Accurate Machine Learning Atmospheric Retrieval via a Neural Network Surrogate Model for Radiative Transfer",
+  journal = {PSJ},
+     year = 2020,
+    pages = {submitted to PSJ}
+}
+
+Thanks!
 

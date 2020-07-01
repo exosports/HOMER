@@ -107,12 +107,11 @@ For details, see \\
 \subsection{System Requirements}
 \label{sec:requirements}
 
-\noindent HOMER was developed on a Unix/Linux machine using the following 
+\noindent HOMER was developed on a Linux machine using the following 
 versions of packages:
 
 \begin{itemize}
 \item Python 3.7.2
-\item GPyOpt 1.2.5
 \item Keras 2.2.4
 \item Numpy 1.16.2
 \item Matplotlib 3.0.2
@@ -121,10 +120,11 @@ versions of packages:
 \item Tensorflow 1.13.1
 \item CUDA 9.1.85
 \item cuDNN 7.5.00
-\item gcc 7.5.0
 \end{itemize}
 
-This conveniently matches the dependencies of MARGE.
+\noindent This conveniently matches the dependencies of MARGE.
+
+\noindent If installing the Datasketches library, CMake 3.12.0+ is required.
 
 
 
@@ -133,23 +133,11 @@ This conveniently matches the dependencies of MARGE.
 
 \noindent To begin, obtain the latest stable version of HOMER.  
 
-\noindent First, create a local directory to hold HOMER.  Let the path to this 
-directory be \texttt{`}localHOMERdir\texttt{`}.
-
+\noindent First, decide on a local directory to hold HOMER.  Let the path to this directory 
+be `HOMER'.  Now, clone the repository:
 \begin{verbatim}
-mkdir `localHOMERdir`
-cd `localHOMERdir`
-\end{verbatim}
-
-\noindent Now, clone the repository:
-\begin{verbatim}
-git clone --recursive https://github.com/exosports/HOMER .
-\end{verbatim}
-
-\noindent Now, modify MC3 as necessary:
-
-\begin{verbatim}
-make mccubed
+git clone --recursive https://github.com/exosports/HOMER HOMER/
+cd HOMER/
 \end{verbatim}
 
 \noindent HOMER contains a file to easily build a conda environment capable of 
@@ -162,78 +150,56 @@ conda env create -f environment.yml
 \noindent Then, activate the environment:
 
 \begin{verbatim}
-conda activate homer
+conda activate marge_homer
 \end{verbatim}
 
-\noindent If the user wishes to compute median and 1-2-3sigma spectra, 
-the datasketches package is required.  Add this to the environment via
+\noindent Now, build the submodules:
+
 \begin{verbatim}
-make datasketches
+make all
 \end{verbatim}
-\noindent from the HOMER directory. Note that this package is NOT required 
-to run HOMER, it is only required to calculate spectra quantiles.
 
-\noindent You are now ready to run HOMER!
+\noindent The Datasketches library is optional.  If you do not want to install it, do 
+\begin{verbatim}
+make mccubed
+\end{verbatim}
+\noindent instead of `make all'.
+
+\noindent You are now ready to run HOMER.
 
 
 \section{Example}
 \label{sec:example}
 
-This directory holds an example of how to run HOMER. It matches the use case 
-demonstrated in Himes et al. (2020).
+\noindent The following script will walk a user through executing all modes of MARGE 
+to simulate the emission spectra of HD 189733 b with a variety of thermal 
+profiles and atmospheric compositions, process the data, and train an NN 
+model to quickly approximate spectra.  These instructions are meant to be 
+executed from a Linux terminal.  Note that the complete execution of all steps 
+requires significant compute resources, especially if lacking a graphics 
+processing unit (GPU).
 
-\noindent \textbf{NOTE}: Executing this example requires files from the 
-MARGE example!  Run that first if you wish to run this example.\newline
+The following script will walk a user through using HOMER for a retrieval on 
+HD 189733 b, following from MARGE's example which trains an NN model for RT 
+for this planet.
 
-\noindent The recommend system specs to run the HOMER example are less than 
-those of the MARGE example.  For users with limited RAM (4 GB or less), the 
-total number of iterations may need to be reduced.  For system storage, 
-{\textless}1 GB is required.  Without a GPU, it will take around 1 day 
-to execute, compared to less than an hour with a modern GPU.\newline
-
-\noindent If using an operating system that is not Linux-based, some aspects of 
-the example will likely need to be adjusted.  Users are encouraged to submit 
-updates to this example guide via pull requests if they find modifications are 
-necessary for certain operating systems.
-
-
-\subsection{Walkthrough}
-
-Ensure that the repo's submodules have also been cloned.  
-When cloning HOMER, this can be done by
+\noindent To begin, copy the requisite files to a directory parallel to HOMER. 
+Beginning from HOMER/, 
 \begin{verbatim}
-git clone --recursive https://github.com/exosports/HOMER HOMER/
-cd MARGE/
+mkdir ../run
+cp -a ./example/* ../run/.
+cd ../run
 \end{verbatim}
-Alternatively, if HOMER has already been cloned, pull the submodules by 
-navigating to the HOMER directory and 
+\noindent Note that, if the user is running this following the MARGE example, 
+the `run' directory should contain all of the files from both examples.
+
+\noindent Now, execute HOMER:
+
 \begin{verbatim}
-git submodule init
-git submodule update
+../HOMER/HOMER.py HOMER.cfg
 \end{verbatim}
 
-\noindent Next, build MCcubed:
-\begin{verbatim}
-make mccubed
-\end{verbatim}
-
-\noindent Now, we are ready to begin.\newline
-
-\noindent Navigate to the directory where the example files are at.
-\begin{verbatim}
-cd example
-\end{verbatim}
-If the user has copied these files to another location outside of HOMER, 
-navigate there instead.  The paths in some input files will need to be changed 
-by the user. \newline
-
-\noindent Execute HOMER:
-\begin{verbatim}
-../HOMER.py example.cfg
-\end{verbatim}
-
-\noindent It will begin the retrieval, and should take \textless 1 hour.
-
+\noindent This will take some time to run. 
 
 
 \section{Program Inputs}
@@ -260,8 +226,14 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
 
 \noindent \underline{Run Parameters}
 \begin{itemize}
+\item quantiles   : bool. Determines whether to compute spectra quantiles.
+                    If the Datasketches library is not install, this setting 
+                    has no effect.
 \item onlyplot    : bool. Determines whether to skip the MCMC.
                     Reproduces plots \& calculations related to posterior.
+\item plot_PT     : bool. Determines whether to compute the explored 
+                    pressure--temperature profiles using the formulation of 
+                    Line et al. (2013)
 \item credregion  : bool. Determines whether to calculate the 68, 95, and 99\% 
                     credible regions \& uncertainties.
 \item compost     : bool. Determines whether to compare HOMER's posterior to 
@@ -273,8 +245,7 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
                           set amount in the posterior to be compared, such as 
                           for unit conversions.
                     Format: val1 val2 val3 val4 ...
-\item postshift   : floats. Same as \texttt{`}compshift\texttt{`}, but for 
-                            HOMER's posterior.
+\item postshift   : floats. Same as `compshift`, but for HOMER's posterior.
 \end{itemize}
 
 
@@ -297,25 +268,20 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
                           input directory.
 \item fstdev      : str.  Path to .NPY file of standard deviation of 
                           inputs/outputs.
-                          See \texttt{`}fmean\texttt{`} for format \& path 
-                          description.
+                          See `fmean` for format \& path description.
 \item fmin        : str.  Path to .NPY file of minima of inputs/outputs.
-                          See \texttt{`}fmean\texttt{`} for format \& path 
-                          description.
+                          See `fmean` for format \& path description.
 \item fmax        : str.  Path to .NPY file of maxima of inputs/outputs.
-                          See \texttt{`}fmean\texttt{`} for format \& path 
-                          description.
+                          See `fmean` for format \& path description.
 \end{itemize}
 
 
 \noindent \underline{Neural Network (NN) Parameters}
 \begin{itemize}
-\item weight\_file: str.  File containing NN model weights.
-                   NOTE: MUST end in .h5
+\item weight\_file: str.  File containing NN model & weights.
+                    NOTE: MUST end in .h5
 \item input\_dim  : int.  Dimensionality of the input  to the NN.
 \item output\_dim : int.  Dimensionality of the output of the NN.
-\item convlayers : ints. Number of nodes for each convolutional layer.
-\item denselayers: ints. Number of nodes for each dense         layer.
 \end{itemize}
 
 \noindent \underline{MCMC Parameters}
@@ -325,7 +291,7 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
 \item func        : strs. Function and file to evaluate at each iteration of 
                           the MCMC.
                           Format: function file
-                          Note: omit the '.py' from \texttt{`}file\texttt{`}.
+                          Note: omit the '.py' from `file`.
 \item pnames      : strs. Name of each free parameter. Can include LaTeX 
                           formatting.
 \item pinit       : floats. Initial parameters for the MCMC.
@@ -340,24 +306,24 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
 \item nchains     : int.  Number of parallel samplers.
 \item thinning    : int.  Thinning factor for posterior.
 \item data        : floats. Values to be fit via MCMC. 
-                          Format: Separate each value by an indented new line.
+                    Format: Separate each value by an indented newline.
+                    Alternatively, specify a .NPY file.
 \item uncert      : floats. Uncertainties on values to be fit via MCMC. 
-                          Same format.
+                          Same format (indented newlines or .NPY)
 \item filters     : strs. Paths to filters associated with each datum. 
-                          Same format.
+                          Same format (indented newlines only)
 \item starspec    : str.  Path to .NPY file of the stellar spectrum.
 \item factor      : str.  Path to .NPY file of multiplication factor by which 
                           to modify de-normalized predictions. 
                           E.g., unit conversion.
-\item wnfact      : float. Multiplication factor to convert 
-                           \texttt{`}xvals\texttt{`} to cm-1.
+\item wnfact      : float. Multiplication factor to convert `xvals` to cm-1.
 \item filt2um     : float. Multiplication factor to convert the filter 
                           wavelengths to microns.
 \item PTargs      : str.  Path to .txt file containing values necessary to 
                           calculate the temperature--pressure profile.
                           Currently, only option is Line et al. (2013) method.
                           Format: R\_star (m), T\_star (K), T\_int (K), 
-                                  sma    (m), grav (cm s-2)
+                                  sma (m), grav (cm s-2)
 
 \end{itemize}
 
@@ -365,15 +331,13 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
 \begin{itemize}
 \item xvals      : str.  Path to .NPY file containing the x-axis values 
                          associated with a prediction.
-                         If relative, path is with respect to 
-                         \texttt{`}inputdir\texttt{`}.
-\item xval\_label : str.  X-axis label for plots.
-\item yval\_label : str.  Y-axis label for plots.
+                         If relative, path is with respect to `inputdir`.
+\item xlabel     : str.  X-axis label for plots.
+\item ylabel     : str.  Y-axis label for plots.
 \item fpress     : str.  Path to text file containing the pressures of each 
                          layer of the atmosphere, for plotting T(p) profiles.
-                         If relative, with respect to 
-                         \texttt{`}inputdir\texttt{`}.
-\item savefile   : str.  Prefix for MCMC plots to be saved.
+                         If relative, with respect to `inputdir`.
+\item savefile   : str.  (optional) Prefix for MCMC plots to be saved.
 \end{itemize}
 
 
@@ -384,18 +348,16 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
 HOMER produces the following outputs:
 
 \begin{itemize}
-\item MCMC.log -- a record of the MCMC
+\item MCMC.log -- a record of the MCMC exploration, including SPEIS, ESS, and 
+                  credible regions.
 \item output.npy -- the posterior determined by the MCMC
-\item MCMC plots -- pairwise, posterior, PT, and trace plots.
-\item ess.txt -- the effective sample size (ESS) of the run.
-\item credregion.txt -- the 68, 95, and 99\% credible regions.
-\item comparison plots -- if \texttt{`}compost\texttt{`}, makes plots of the 
-                          1D marginalized 
+\item MCMC plots -- pairwise, posterior, PT (if `plot_PT`), and trace plots.
+\item comparison plots -- if `compost`, makes plots of the 1D marginalized 
                           posteriors, 2D pairwise posteriors, and explored 
                           temperature--presure profiles.
-\item bhatchar.npy -- if \texttt{`}compost\texttt{`}, calculates the 
-                      Bhattacharyya coefficients between HOMER's posterior and 
-                      the other specified posterior.
+\item bhatchar.npy -- if `compost`, calculates the Bhattacharyya coefficients 
+                      between HOMER's posterior and the other specified 
+                      posterior.
 \end{itemize}
 
 
