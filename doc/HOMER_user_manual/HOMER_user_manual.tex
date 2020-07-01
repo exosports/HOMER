@@ -231,7 +231,7 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
                     has no effect.
 \item onlyplot    : bool. Determines whether to skip the MCMC.
                     Reproduces plots \& calculations related to posterior.
-\item plot_PT     : bool. Determines whether to compute the explored 
+\item plot\_PT    : bool. Determines whether to compute the explored 
                     pressure--temperature profiles using the formulation of 
                     Line et al. (2013)
 \item credregion  : bool. Determines whether to calculate the 68, 95, and 99\% 
@@ -278,7 +278,7 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
 
 \noindent \underline{Neural Network (NN) Parameters}
 \begin{itemize}
-\item weight\_file: str.  File containing NN model & weights.
+\item weight\_file: str.  File containing NN model and weights.
                     NOTE: MUST end in .h5
 \item input\_dim  : int.  Dimensionality of the input  to the NN.
 \item output\_dim : int.  Dimensionality of the output of the NN.
@@ -351,7 +351,7 @@ HOMER produces the following outputs:
 \item MCMC.log -- a record of the MCMC exploration, including SPEIS, ESS, and 
                   credible regions.
 \item output.npy -- the posterior determined by the MCMC
-\item MCMC plots -- pairwise, posterior, PT (if `plot_PT`), and trace plots.
+\item MCMC plots -- pairwise, posterior, PT (if `plot\_PT`), and trace plots.
 \item comparison plots -- if `compost`, makes plots of the 1D marginalized 
                           posteriors, 2D pairwise posteriors, and explored 
                           temperature--presure profiles.
