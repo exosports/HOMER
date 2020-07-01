@@ -10,7 +10,7 @@ import matplotlib.ticker as tck
 plt.ion()
 
 
-def get_bestfit(allmodel, allparam, flog):
+def get_bestfit(allmodel, allparam, flog, ifree):
     """
     Extracts the best-fit model from the posterior.
 
@@ -19,6 +19,8 @@ def get_bestfit(allmodel, allparam, flog):
     allmodel: array. All evaluated models.
     allparam: array. Parameters of evaluated models.
     flog    : str.   MC3 log file.
+    ifree   : array, bools. True for free parameters, 
+                            False for fixed/shared parameters.
 
     Outputs
     -------
@@ -49,31 +51,34 @@ def get_bestfit(allmodel, allparam, flog):
             bestp[n-i] = parvals[0]
 
         # Find the corresponding model by minimizing sum of squared differences
-        ind = np.argmin(np.sum((allparam - bestp[:, None])**2, axis=0))
+        ind = np.argmin(np.sum((allparam - bestp[ifree, None])**2, axis=0))
         bestfit = allmodel[:, ind]
 
         return bestfit
 
 
-def plot_bestfit(outputdir, xvals, data, uncert, meanwn, ifilt, bestfit, kll=None, wn=True):
+def plot_bestfit(outputdir, xvals, data, uncert, meanwn, ifilt, bestfit, 
+                 xlabel, ylabel, kll=None, wn=True):
     """
     Plots the best-fit model.
 
     Inputs
     ------
     outputdir: string. Directory where plot will be saved.
-    xvals  : array. X values values for unbinned models. 
-                    Must be either in cm-1 (with wn=True) or um (with wn=False)
-    data   : array. Data points being fit.
-    uncert : array. Uncertainties on data points being fit.
-    meanwn : array. Mean wavenumuber of each filter.
-    ifilt  : array. Indices of `xvals` corresponding to the filter bandpass.
-                    shape: (len(filters), 2)
-                    ifilt[0, 0] gives the first filter's starting index
-                    ifilt[0, 1] gives the first filter's ending   index
-    bestfit: array. Best-fit model values, corresponding to `data`.
+    xvals  : array.  X values values for unbinned models. 
+                     Must be either in cm-1 (with wn=True) or um (with wn=False)
+    data   : array.  Data points being fit.
+    uncert : array.  Uncertainties on data points being fit.
+    meanwn : array.  Mean wavenumuber of each filter.
+    ifilt  : array.  Indices of `xvals` corresponding to the filter bandpass.
+                     shape: (len(filters), 2)
+                     ifilt[0, 0] gives the first filter's starting index
+                     ifilt[0, 1] gives the first filter's ending   index
+    bestfit: array.  Best-fit model values, corresponding to `data`.
+    xlabel : string. X-axis label.
+    ylabel : string. Y-axis label.
     kll    : object. Streaming quantiles calculator, for 1-2-3 sigma spectra.
-    wn     : bool.  Determines if `xvals` is in wavenumber or wavelength.
+    wn     : bool.   Determines if `xvals` is in wavenumber or wavelength.
 
     Outputs
     -------
@@ -92,8 +97,16 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwn, ifilt, bestfit, kll=Non
 
     if wn:
         xvals  = 1e4/xvals
-        meanwn = 1e4/meanwn
-        ifilt = ifilt[:,::-1]
+    if ifilt is None:
+        xerr = np.zeros((2, len(xvals)))
+        xerr[0, 1:  ] = np.abs(xvals[1:  ] - xvals[ :-1])/2
+        xerr[1,  :-1] = np.abs(xvals[ :-1] - xvals[1:  ])/2
+        xerr[0, 0   ] = xerr[0, 1]
+        xerr[1, 1   ] = xerr[1, 0]
+    else:
+        if wn:
+            meanwn = 1e4/meanwn
+            ifilt = ifilt[:,::-1]
 
     # Plot
     plt.figure(42, dpi=600)
@@ -107,16 +120,24 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwn, ifilt, bestfit, kll=Non
         ax.fill_between(xvals, lo1, hi1, facecolor="cornflowerblue", #1873CC
                         edgecolor="cornflowerblue", label="1$\sigma$")
         plt.plot(xvals, median, "royalblue", label="Median")
-    plt.scatter(meanwn, bestfit*1e3, c="k", label="Best fit", zorder=30, 
-                lw=1, s=16)
-    plt.errorbar(meanwn, data*1e3, 
-                 yerr=uncert*1e3, xerr=np.abs(xvals[ifilt].T - meanwn), 
-                 fmt="or", markersize=3, capsize=2, elinewidth=1, 
-                 ecolor='tab:red', label="Data", zorder=20)
+    if meanwn is not None:
+        plt.scatter(meanwn, bestfit, c="k", label="Best fit", zorder=30, 
+                    lw=1, s=6)
+        plt.errorbar(meanwn, data, 
+                     yerr=uncert, xerr=np.abs(xvals[ifilt].T - meanwn), 
+                     fmt="or", markersize=1.5, capsize=1.5, elinewidth=1, 
+                     ecolor='tab:red', label="Data", zorder=20)
+    else:
+        plt.scatter(xvals, bestfit, c="k", label="Best fit", zorder=30, 
+                    lw=1, s=6)
+        plt.errorbar(xvals, data, 
+                     yerr=uncert, xerr=xerr, 
+                     fmt="or", markersize=1.5, capsize=1.5, elinewidth=1, 
+                     ecolor='tab:red', label="Data", zorder=20)
     plt.legend(loc='best')
     ax.set_xlim(np.amin(xvals), np.amax(xvals))
-    ax.set_ylabel(r"$F_p/F_s$ (10$^{-3}$)")
-    ax.set_xlabel("Wavelength ${\\rm(\u03bcm)}$")
+    ax.set_ylabel(r""+ylabel)
+    ax.set_xlabel(r""+xlabel)
     ax.set_xscale('log')
     formatter = tck.FuncFormatter(lambda y, _: '{:.8g}'.format(y))
     ax.get_xaxis().set_major_formatter(formatter)

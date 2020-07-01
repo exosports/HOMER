@@ -18,21 +18,29 @@ libdir = os.path.dirname(__file__) + '/lib'
 sys.path.append(libdir)
 
 import NN
-import bestfit    as BF
-import compost    as C
-import credregion as CR
-import utils      as U
-import mcplots    as P
+import bestfit   as BF
+import compost   as C
+import utils     as U
+import mcmcplots as P
 
 mc3dir = os.path.dirname(__file__) + '/modules/MCcubed'
 sys.path.append(mc3dir)
-mcdir = os.path.dirname(__file__) + '/modules/MCcubed/MCcubed'
-sys.path.append(mcdir)
+mccdir = os.path.dirname(__file__) + '/modules/MCcubed/MCcubed'
+sys.path.append(mccdir)
+mcpdir = os.path.dirname(__file__) + '/modules/MCcubed/MCcubed/plots'
+sys.path.append(mcpdir)
+import mcplots as mcp
 mcmcdir = os.path.dirname(__file__) + '/modules/MCcubed/MCcubed/mc'
 sys.path.append(mcmcdir)
 import MCcubed as mc3
-# NOTE: datasketches imported later, so that users are not forced to use it
-#       see just before the MCMC is called
+
+try:
+    import datasketches as ds
+    print('Using the datasketches package to calculate ' + \
+          'spectra quantiles, if requested.')
+except:
+    print('datasketches package is not available.  Will ' + \
+          'not calculate spectra quantiles.')
 
 
 def HOMER(cfile):
@@ -60,10 +68,11 @@ def HOMER(cfile):
             ### Unpack the variables ###
             # Top-level params
             onlyplot   = conf.getboolean("onlyplot")
-            credregion = conf.getboolean("credregion")
             compost    = conf.getboolean("compost")
             normalize  = conf.getboolean("normalize")
             scale      = conf.getboolean("scale")
+            plot_PT    = conf.getboolean("plot_PT")
+            quantiles  = conf.getboolean("quantiles")
 
             # Directories
             inputdir  = os.path.join(os.path.abspath(conf["inputdir" ]), '')
@@ -73,15 +82,21 @@ def HOMER(cfile):
 
             # Data & model info
             if conf["data"][-4:] == '.npy':
-                data    = np.load(inputdir + conf["data"])
+                if os.path.isabs(conf["data"]):
+                    data = np.load(conf["data"])
+                else:
+                    data = np.load(inputdir + conf["data"])
             else:
-                data    = np.array([float(num)                      \
-                                    for num in conf["data"].split()])
+                data = np.array([float(num)                      \
+                                 for num in conf["data"].split()])
             if conf["uncert"][-4:] == '.npy':
-                uncert  = np.load(inputdir + conf["uncert"])
+                if os.path.isabs(conf["uncert"]):
+                    uncert = np.load(conf["uncert"])
+                else:
+                    uncert = np.load(inputdir + conf["uncert"])
             else:
-                uncert  = np.array([float(num)                        \
-                                    for num in conf["uncert"].split()])
+                uncert = np.array([float(num)                        \
+                                   for num in conf["uncert"].split()])
             if conf["filters"] != 'None':
                 filters = conf["filters"].split()
                 filt2um = float(conf["filt2um"])
@@ -106,29 +121,24 @@ def HOMER(cfile):
             else:
                 starspec = None
 
-            try:
-                factor = np.load(conf["factor"])
-            except:
-                try:
-                    factor = np.load(inputdir + conf["factor"])
-                except:
-                    factor = float(conf["factor"])
-
-            if conf["factor"][-4:] == '.npy':
-                if os.path.isabs(conf["factor"]):
-                    factor = np.load(conf["factor"])
+            if conf["factor"] != 'None':
+                if conf["factor"][-4:] == '.npy':
+                    if os.path.isabs(conf["factor"]):
+                        factor = np.load(conf["factor"])
+                    else:
+                        factor = np.load(inputdir + conf["factor"])
                 else:
-                    factor = np.load(inputdir + conf["factor"])
+                    try:
+                        factor = float(conf["factor"])
+                    except:
+                        factor = 1.
             else:
-                try:
-                    factor = float(conf["factor"])
-                except:
-                    factor = 1.
+                factor = None
 
             if conf["PTargs"] == 'None' or conf["PTargs"] == '':
                 PTargs = []
             else:
-                if   conf["PTargs"][-4:] == '.txt':
+                if conf["PTargs"][-4:] == '.txt':
                     if os.path.isabs(conf["PTargs"]):
                         PTargs = np.loadtxt(conf["PTargs"])
                     else:
@@ -146,29 +156,24 @@ def HOMER(cfile):
             else:
                 weight_file = conf["weight_file"]
 
-            inD    = conf.getint("input dim")
-            outD   = conf.getint("output dim")
+            inD    = conf.getint("inD")
+            outD   = conf.getint("outD")
             ilog   = conf.getboolean("ilog")
             olog   = conf.getboolean("olog")
-            xvals  = np.load(conf["xvals"])
+            if os.path.isabs(conf["xvals"]):
+                xvals = np.load(conf["xvals"])
+            else:
+                xvals = np.load(inputdir + conf["xvals"])
+            wn     = conf.getboolean("wn")
             wnfact = float(conf["wnfact"])
-            xlabel = conf["xval label"]
-            ylabel = conf["yval label"]
+            xlabel = conf["xlabel"]
+            ylabel = conf["ylabel"]
             fmean  = conf["fmean"]
             fstdev = conf["fstdev"]
             fmin   = conf["fmin"]
             fmax   = conf["fmax"]
-            fpress = conf["fpress"]
-
-            convlayers     = conf["convlayers"]
-            if convlayers == "None" or convlayers == '':
-                convlayers = None
-                conv       = False
-            else:
-                convlayers =  [int(num) for num in convlayers.split()]
-                conv       = True
-
-            layers =  [int(num) for num in conf["layers"].split()]
+            if plot_PT:
+                fpress = conf["fpress"]
 
             # Plotting parameters
             if conf['pnames'] == '':
@@ -193,8 +198,10 @@ def HOMER(cfile):
             else:
                 flog = None
 
-            func     = conf["func"].split()
-            evalfunc = importlib.import_module(func[1]).__getattribute__(func[0])
+            f = conf["func"].split()
+            if len(f) == 3:
+                sys.path.append(f[2])
+            func     = importlib.import_module(f[1]).__getattribute__(f[0])
             pinit    = np.array([float(val) for val in conf["pinit"].split()])
             pmin     = np.array([float(val) for val in conf["pmin" ].split()])
             pmax     = np.array([float(val) for val in conf["pmax" ].split()])
@@ -285,37 +292,38 @@ def HOMER(cfile):
                 y_max     =  1.
                 scalelims = [0., 1.]
 
-            # Load filters
-            filttran = []
-            ifilt = np.zeros((len(filters), 2), dtype=int)
-            meanwn = []
-            for i in range(len(filters)):
-                datfilt = np.loadtxt(filters[i])
-                # Convert filter wavelenths to microns, then convert um -> cm-1
-                finterp = si.interp1d(10000. / (filt2um * datfilt[:,0]), 
-                                      datfilt[:,1],
-                                      bounds_error=False, fill_value=0)
-                # Interpolate and normalize
-                tranfilt = finterp(xvals)
-                tranfilt = tranfilt / np.trapz(tranfilt, xvals)
-                meanwn.append(np.sum(xvals*tranfilt)/sum(tranfilt))
-                # Find non-zero indices for faster integration
-                nonzero = np.where(tranfilt!=0)
-                ifilt[i, 0] = max(nonzero[0][ 0] - 1, 0)
-                ifilt[i, 1] = min(nonzero[0][-1] + 1, len(xvals)-1)
-                filttran.append(tranfilt[ifilt[i,0]:ifilt[i,1]]) # Store filter
+            if filters is not None:
+                # Load filters
+                filttran = []
+                ifilt = np.zeros((len(filters), 2), dtype=int)
+                meanwn = []
+                for i in range(len(filters)):
+                    datfilt = np.loadtxt(filters[i])
+                    # Convert filter wavelenths to microns, then convert um -> cm-1
+                    finterp = si.interp1d(10000. / (filt2um * datfilt[:,0]), 
+                                          datfilt[:,1],
+                                          bounds_error=False, fill_value=0)
+                    # Interpolate and normalize
+                    tranfilt = finterp(xvals)
+                    tranfilt = tranfilt / np.trapz(tranfilt, xvals)
+                    meanwn.append(np.sum(xvals*tranfilt)/sum(tranfilt))
+                    # Find non-zero indices for faster integration
+                    nonzero = np.where(tranfilt!=0)
+                    ifilt[i, 0] = max(nonzero[0][ 0] - 1, 0)
+                    ifilt[i, 1] = min(nonzero[0][-1] + 1, len(xvals)-1)
+                    filttran.append(tranfilt[ifilt[i,0]:ifilt[i,1]]) # Store filter
 
-            meanwn = np.asarray(meanwn)
+                meanwn = np.asarray(meanwn)
+            else:
+                ifilt    = None
+                filttran = None
+                meanwn   = None
 
             ### Check if datasketches is available ###
-            try:
-                from datasketches import kll_floatarray_sketches
-                print('Using the datasketches package to calculate ' + \
-                      'spectra quantiles.')
-                kll = kll_floatarray_sketches(10000, outD)
-            except:
-                print('datasketches package is not available.  Will ' + \
-                      'not calculate spectra quantiles.')
+            if ds and quantiles:
+                # FINDME Hard-coded 1000 for accuracy. Change to config option?
+                kll = ds.vector_of_kll_floats_sketches(1000, outD)
+            else:
                 kll = None
 
             # Save file names
@@ -324,7 +332,7 @@ def HOMER(cfile):
             fsavesks   = outputdir + 'sketches.pickle'
             if not onlyplot:
                 # Instantiate model
-                print('Building model...')
+                print('\nBuilding model...\n')
                 nn = NN.NNModel(weight_file)
 
                 # Run the MCMC
@@ -332,7 +340,8 @@ def HOMER(cfile):
                     logfile = open(flog, 'w')
                 else:
                     logfile = None
-                outp, bestp = mc3.mc.mcmc(data, uncert, func=evalfunc, 
+                count = np.array([0]) # to determine when to begin updating sketches
+                outp, bestp = mc3.mc.mcmc(data, uncert, func=func, 
                                           indparams=[nn, 
                                                      x_mean, x_std, 
                                                      y_mean, y_std, 
@@ -342,12 +351,13 @@ def HOMER(cfile):
                                                      xvals*wnfact,
                                                      starspec, factor, 
                                                      filttran, ifilt, 
-                                                     conv, ilog, olog, kll],
+                                                     ilog, olog, 
+                                                     kll, count, burnin],
                                           parnames=pnames, params=pinit, 
                                           pmin=pmin, pmax=pmax, stepsize=pstep,
                                           numit=niter, burnin=burnin, 
                                           nchains=nchains, 
-                                          walk='snooker', hsize=2*nchains, 
+                                          walk='snooker', hsize=4*nchains, 
                                           plots=False, leastsq=False, 
                                           log=logfile, 
                                           savefile =fsavefile,
@@ -371,27 +381,13 @@ def HOMER(cfile):
                             kll.deserialize(desers[i], i)
                     except:
                         print("No sketch file found.  Will not plot quantiles.")
-            # Load posterior, shape (nchains, nfree, niterperchain)
-            outpc = np.load(fsavefile)
-            if credregion:
-                print('Calculating effective sample size...\n')
-                fess = open(outputdir + 'ess.txt', 'w')
-                speis, ess = CR.ess(outpc[:, :, burnin:])
-                print('SPEIS:', speis)
-                print('ESS  :', ess)
-                fess.write('SPEIS:' + str(speis))
-                fess.write('ESS  :' + str(ess))
-                siggy = CR.sig(ess, 
-                               p_est=perc)
-                for i in range(len(perc)):
-                    print('  ' + str(perc[i]) + u"\u00B1" + str(siggy[i]))
-                    fess.write('  ' + str(perc[i]) + u"\u00B1" + str(siggy[i]))
-                fess.close()
-
-            # Stack it to be (nfree, niter), remove burnin
-            outp = outpc[0, :, burnin:]
-            for c in range(1, nchains):
-                outp = np.hstack((outp, outpc[c, :, burnin:]))
+                # Load posterior, shape (nchains, nfree, niterperchain)
+                outpc = np.load(fsavefile)
+                # Stack it to be (nfree, niter), remove burnin
+                outp = outpc[0, :, burnin:]
+                for c in range(1, nchains):
+                    outp = np.hstack((outp, outpc[c, :, burnin:]))
+                del outpc
 
             # Load the evaluated models & stack, excluding burnin
             evalmodels = np.load(fsavemodel)
@@ -400,55 +396,47 @@ def HOMER(cfile):
                 allmodel = np.hstack((allmodel, evalmodels[c, :, burnin:]))
 
             # Plot best-fit model
-            bestfit = BF.get_bestfit(allmodel, outp, flog)
-            BF.plot_bestfit(outputdir, xvals, data, uncert, meanwn, ifilt, bestfit, kll)
+            print("\nPlotting best-fit model...\n")
+            bestfit = BF.get_bestfit(allmodel, outp, flog, pstep>0)
+            BF.plot_bestfit(outputdir, xvals, data, uncert, meanwn, ifilt, 
+                            bestfit, xlabel, ylabel, kll, wn)
 
             # Shift posterior params, if needed (e.g., for units)
             if postshift is not None:
                 outp += np.expand_dims(postshift, -1)
 
             # Make plots of posterior
-            print('\nMaking plots of the posterior...\n')
-            P.trace(outp, parname=pnames, thinning=thinning, 
-                    sep=np.size(outp[0]//nchains), 
-                    savefile=outputdir+savefile+"MCMC_trace.png")
-            P.histogram(outp, parname=pnames, thinning=thinning, 
-                        savefile=outputdir+savefile+"MCMC_posterior.png")
-            P.pairwise(outp, parname=pnames, thinning=thinning, 
-                       savefile=outputdir+savefile+"MCMC_pairwise.png")
+            print('Making plots of the posterior...\n')
+            pnames = np.asarray(pnames)
+            mcp.trace(outp, parname=pnames[pstep>0], thinning=thinning, 
+                      sep=np.size(outp[0]//nchains), 
+                      savefile=outputdir+savefile+"MCMC_trace.png")
+            mcp.histogram(outp, parname=pnames[pstep>0], thinning=thinning, 
+                          savefile=outputdir+savefile+"MCMC_posterior.png")
+            mcp.pairwise(outp, parname=pnames[pstep>0], thinning=thinning, 
+                         savefile=outputdir+savefile+"MCMC_pairwise.png")
 
             # PT profiles
-            pressure = np.loadtxt(inputdir + fpress, skiprows=1)[:,1]
-            P.mcmc_pt(outp[:5], pressure, PTargs, 
-                      savefile=outputdir+savefile+"MCMC_PT.png")
+            if plot_PT:
+                print("Plotting PT profiles...\n")
+                pressure = np.loadtxt(inputdir + fpress, skiprows=1)[:,1]
+                P.mcmc_pt(outp[:5], pressure, PTargs, 
+                          savefile=outputdir+savefile+"MCMC_PT.png")
 
             # Format parameter names, and find maximum length
             parname = []
             pnlen   = 0
             for i in range(len(pnames)):
+                if pstep[i] <= 0:
+                    continue
                 parname.append(pnames[i].replace('$', '').replace('\\', '').\
-                                         replace('_', '').replace('^' , ''))
-                pnlen = max(pnlen, len(parname[i]))
-            # Compute credible regions
-            if credregion:
-                print('Calculating credible regions...\n')
-                fcred = open(outputdir + 'credregion.txt', 'w')
-                for n in range(outp.shape[0]):
-                    pdf, xpdf, CRlo, CRhi = CR.credregion(outp[n], perc)
-                    creg = [' U '.join(['({:10.4e}, {:10.4e})'.format(
-                                        CRlo[j][k], CRhi[j][k])
-                                        for k in range(len(CRlo[j]))])
-                            for j in range(len(CRlo))]
-                    print(parname[n] + " credible region:")
-                    fcred.write(parname[n] + " credible region:")
-                    for p in range(len(perc)):
-                        print("  " + str(100*perc[p]) + "%: " + str(creg[p]))
-                        fcred.write("  " + str(100*perc[p]) + "%: " + str(creg[p]))
-                fcred.close()
+                                         replace('_', '').replace('^' , '').\
+                                         replace('{', '').replace('}' , ''))
+                pnlen = max(pnlen, len(parname[-1]))
 
             # Compare the posterior to another result
             if compost:
-                print('\nMaking comparison plots of posteriors...')
+                print('Making comparison plots of posteriors...\n')
                 compfile = conf["compfile"]
                 compname = conf["compname"]
                 if not os.path.isabs(conf["compsave"]):
@@ -468,29 +456,32 @@ def HOMER(cfile):
                 if compshift is not None:
                     cstack += np.expand_dims(compshift, -1)
                 # Make comparison plot
-                print('Plotting histograms of 1D posteriors...')
                 C.comp_histogram(outp, cstack, 
                                  'HOMER', compname, 
                                  pnames, 
                                  savefile=compsave+'_hist.png')
                 print('Bhattacharyya coefficients:')
-                bhatchar = np.zeros(len(pnames))
-                for i in range(len(pnames)):
-                    rng   = min(outp[i].min(), cstack[i].min()), max(outp[i].max(), cstack[i].max())
-                    hist1 = np.histogram(outp[i],   density=False, bins=60, range=rng)[0]/outp[i].shape[0]
-                    hist2 = np.histogram(cstack[i], density=False, bins=60, range=rng)[0]/cstack[i].shape[0]
-                    bhatchar[i] = np.sum(np.sqrt(hist1 * hist2))
-                    print('  '+parname[i].ljust(pnlen, ' ')+': '+str(bhatchar[i]))
+                bhatchar = np.zeros(sum(pstep>0))
+                for n in range(sum(pstep>0)):
+                    rng   = min(outp[n].min(), cstack[n].min()), \
+                            max(outp[n].max(), cstack[n].max())
+                    hist1 = np.histogram(outp[n],   density=False, bins=60, 
+                                         range=rng)[0]/outp[n].shape[0]
+                    hist2 = np.histogram(cstack[n], density=False, bins=60, 
+                                         range=rng)[0]/cstack[n].shape[0]
+                    bhatchar[n] = np.sum(np.sqrt(hist1 * hist2))
+                    print('  '+parname[n].ljust(pnlen, ' ') + ': ' + \
+                          str(bhatchar[n]))
+                    n += 1
                 print('  '+'Mean'.ljust(pnlen, ' ')+':', np.mean(bhatchar))
                 np.save(outputdir+'bhatchar.npy', bhatchar)
-                print('Plotting PT profiles...')
-                C.comp_PT(pressure, outp[:5], cstack[:5], 'HOMER', compname, 
-                          PTargs, savefile=compsave+'_PT.png')
-                print('Plotting pairwise posteriors...')
+                if plot_PT:
+                    C.comp_PT(pressure, outp[:5], cstack[:5], 'HOMER', compname,
+                              PTargs, savefile=compsave+'_PT.png')
                 C.comp_pairwise(outp, cstack, 
-                                 'HOMER', compname, 
-                                 pnames, 
-                                 savefile=compsave+'_pair.png')
+                                'HOMER', compname, 
+                                pnames, 
+                                savefile=compsave+'_pair.png')
 
     return
 

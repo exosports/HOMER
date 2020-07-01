@@ -1,23 +1,13 @@
+all: mccubed datasketches
 
 mccubed:
-	@if [ ! -d "./modules/MCcubed" ]; then                                    \
-		echo "\nCloning MCcubed...";                                          \
-		git clone https://github.com/pcubillos/mc3 modules/MCcubed/;          \
-		echo "Finished cloning MCcubed into 'modules'.\n";                    \
-		echo "Switching to the compatible MCcubed version...";                \
-		cd modules/MCcubed;                                                   \
-		git checkout mpi;                                                     \
-		cd ../..;                                                             \
-	else                                                                      \
-		echo "MCcubed already exists.\n";                                     \
-	fi
-	@echo "\nModifying files within MCcubed..."
-	@yes | cp -R code/MCcubed/ modules/
-	@echo "\nCompiling MCcubed..."
 	@cd ./modules/MCcubed && make
 	@echo "Finished compiling MCcubed.\n"
 
 datasketches:
 	@echo "Installing the datasketches package...\n"
-	@cd modules/incubator-datasketches-cpp && pip install .
+	@cd modules/datasketches && python setup.py build && pip install .
+	@echo "pip may have complained above about the build failing, but it may "
+	@echo "have\nstill been successfully installed.  To test, try to import "
+	@echo "datasketches in a\nPython session.\n"
 

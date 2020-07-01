@@ -66,9 +66,9 @@ lib/            - Contains the classes and functions of HOMER.
   NN.py         - Contains a function to load a MARGE NN model.
   utils.py      - Contains utiity functions.
 Makefile        - Handles setting up BART, and creating a TLI file.
-modules/        - Contains necessary modules for data generation.
-                  Initially only contains the datsketches library; 
-                  will contain MCcubed via the Makefile.
+modules/        - Contains submodules for data generation, quantile calculation.
+  datasketches  - Streaming quantiles package.
+  MCcubed       - MCMC package.
 README          - This file!
 
 

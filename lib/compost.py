@@ -4,10 +4,10 @@ Module that contains functions to overplot posteriors.
 comp_histogram: Plots the probability density functions of 1D marginalized 
                 posteriors for two MCMC runs.
 
-comp_pt: Plots the explored temperature--pressure profiles for two MCMC runs.
-
 comp_pairwise: Plots the probability density functions of 2D pairwise 
                posteriors for two MCMC runs.
+
+comp_pt: Plots the explored temperature--pressure profiles for two MCMC runs.
 
 """
 
@@ -16,7 +16,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-import mcplots as P
+import mcmcplots as P
 
 
 def comp_histogram(stack1, stack2, name1, name2, 
@@ -82,9 +82,11 @@ def comp_histogram(stack1, stack2, name1, name2,
         if i%ncolumns == 0:
             plt.ylabel('Normalized PDF', size=fs)
         plt.xlabel(parname[i], size=fs)
-        a = plt.hist(stack1[i], bins, alpha=0.5, label=name1, density=True, 
+        rng   = min(stack1[i].min(), stack2[i].min()), \
+                max(stack1[i].max(), stack2[i].max())
+        a = plt.hist(stack1[i], bins, range=rng, alpha=0.5, label=name1, density=True, 
                      color='b')
-        a = plt.hist(stack2[i], bins, alpha=0.5, label=name2, density=True, 
+        a = plt.hist(stack2[i], bins, range=rng, alpha=0.5, label=name2, density=True, 
                      color='r')
         if i == npars - 1:
             ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), prop={"size":fs})
@@ -93,76 +95,6 @@ def comp_histogram(stack1, stack2, name1, name2,
     if savefile is not None:
         plt.savefig(savefile, bbox_inches='tight')
 
-    plt.close()
-
-
-def comp_PT(pressure, stack1, stack2, name1, name2, 
-            PTargs, fs=26, savefile=None):
-    """
-    Plots the median, 1sigma, and 2sigma regions for the temperature--pressure 
-    profiles explored for two MCMC runs.
-    
-    Inputs
-    ------
-    pressure: array.  Pressures associated with each layer of the atmosphere.
-    stack1  : array.  Posterior, shaped (nparams, niterations)
-    stack2  : array.  Same as `stack1`, but for the posterior to be compared.
-    name1   : string. Label name for `stack1`
-    name2   : string. Label name for `stack2`
-    PTargs  : list.   Path to .txt file containing values necessary to 
-                      calculate the temperature--pressure profile.
-                      Currently, only option is Line et al. (2013) method.
-                      Format: R_star (meters), T_star (Kelvin), T_int (Kelvin),
-                              sma    (meters), grav (cm s-2)
-    fs      : int.    Font size for plots.
-    savefile: string. Path/to/file where the plot will be saved.
-    """
-    # Calculate PT profiles
-    pt1 = np.zeros((np.shape(stack1)[1], len(pressure)))
-    pt2 = np.zeros((np.shape(stack2)[1], len(pressure)))
-    for i in np.arange(0, np.shape(stack1)[1]):
-        PTparams = np.concatenate((stack1[:,i], PTargs))
-        pt1[i]   = P.PT_line(pressure, *PTparams)
-    for i in np.arange(0, np.shape(stack2)[1]):
-        PTparams = np.concatenate((stack2[:,i], PTargs))
-        pt2[i]   = P.PT_line(pressure, *PTparams)
-
-    lo1_1sig = np.percentile(pt1, 15.87, axis=0)
-    hi1_1sig = np.percentile(pt1, 84.13, axis=0)
-    lo1_2sig = np.percentile(pt1,  2.28, axis=0)
-    hi1_2sig = np.percentile(pt1, 97.72, axis=0)
-    med1     = np.median(    pt1,        axis=0)
-
-    lo2_1sig = np.percentile(pt2, 15.87, axis=0)
-    hi2_1sig = np.percentile(pt2, 84.13, axis=0)
-    lo2_2sig = np.percentile(pt2,  2.28, axis=0)
-    hi2_2sig = np.percentile(pt2, 97.72, axis=0)
-    med2     = np.median(    pt2,        axis=0)
-
-    # plot figure
-    plt.figure(2, dpi=300)
-    plt.clf()
-    ax1=plt.subplot(111)
-    ax1.fill_betweenx(pressure, lo1_2sig, hi1_2sig, facecolor="#62B1FF", 
-                      label=name1+' 2$\sigma$', alpha=0.5, edgecolor="0.5")
-    ax1.fill_betweenx(pressure, lo1_1sig, hi1_1sig, facecolor="#1873CC",
-                      label=name1+' 1$\sigma$', alpha=0.5, edgecolor="#1873CC")
-    plt.semilogy(med1, pressure, "-", lw=2, label=name1+' Median',color="k")
-    ax1.fill_betweenx(pressure, lo2_2sig, hi2_2sig, facecolor="#ff6a62", 
-                      label=name2+' 2$\sigma$', alpha=0.5, edgecolor="0.5")
-    ax1.fill_betweenx(pressure, lo2_1sig, hi2_1sig, facecolor="#cc3318",
-                      label=name2+' 1$\sigma$', alpha=0.5, edgecolor="#cc3318")
-    plt.semilogy(med2, pressure, "-", lw=2, label=name2+' Median',color="k", 
-                 ls='--')
-    plt.ylim(pressure[0], pressure[-1])
-    plt.legend(loc="best")
-    plt.xlabel("Temperature  (K)", size=15)
-    plt.ylabel("Pressure  (bar)",  size=15)
-    plt.gca().invert_yaxis()
-
-    # save figure
-    if savefile is not None:
-        plt.savefig(savefile)
     plt.close()
 
 
@@ -312,6 +244,76 @@ def comp_pairwise(stack1, stack2, name1, name2,
     if savefile is not None:
         plt.savefig(savefile, bbox_inches='tight')
 
+    plt.close()
+
+
+def comp_PT(pressure, stack1, stack2, name1, name2, 
+            PTargs, fs=26, savefile=None):
+    """
+    Plots the median, 1sigma, and 2sigma regions for the temperature--pressure 
+    profiles explored for two MCMC runs.
+    
+    Inputs
+    ------
+    pressure: array.  Pressures associated with each layer of the atmosphere.
+    stack1  : array.  Posterior, shaped (nparams, niterations)
+    stack2  : array.  Same as `stack1`, but for the posterior to be compared.
+    name1   : string. Label name for `stack1`
+    name2   : string. Label name for `stack2`
+    PTargs  : list.   Path to .txt file containing values necessary to 
+                      calculate the temperature--pressure profile.
+                      Currently, only option is Line et al. (2013) method.
+                      Format: R_star (meters), T_star (Kelvin), T_int (Kelvin),
+                              sma    (meters), grav (cm s-2)
+    fs      : int.    Font size for plots.
+    savefile: string. Path/to/file where the plot will be saved.
+    """
+    # Calculate PT profiles
+    pt1 = np.zeros((np.shape(stack1)[1], len(pressure)))
+    pt2 = np.zeros((np.shape(stack2)[1], len(pressure)))
+    for i in np.arange(0, np.shape(stack1)[1]):
+        PTparams = np.concatenate((stack1[:,i], PTargs))
+        pt1[i]   = P.PT_line(pressure, *PTparams)
+    for i in np.arange(0, np.shape(stack2)[1]):
+        PTparams = np.concatenate((stack2[:,i], PTargs))
+        pt2[i]   = P.PT_line(pressure, *PTparams)
+
+    lo1_1sig = np.percentile(pt1, 15.87, axis=0)
+    hi1_1sig = np.percentile(pt1, 84.13, axis=0)
+    lo1_2sig = np.percentile(pt1,  2.28, axis=0)
+    hi1_2sig = np.percentile(pt1, 97.72, axis=0)
+    med1     = np.median(    pt1,        axis=0)
+
+    lo2_1sig = np.percentile(pt2, 15.87, axis=0)
+    hi2_1sig = np.percentile(pt2, 84.13, axis=0)
+    lo2_2sig = np.percentile(pt2,  2.28, axis=0)
+    hi2_2sig = np.percentile(pt2, 97.72, axis=0)
+    med2     = np.median(    pt2,        axis=0)
+
+    # plot figure
+    plt.figure(2, dpi=300)
+    plt.clf()
+    ax1=plt.subplot(111)
+    ax1.fill_betweenx(pressure, lo1_2sig, hi1_2sig, facecolor="#62B1FF", 
+                      label=name1+' 2$\sigma$', alpha=0.5, edgecolor="0.5")
+    ax1.fill_betweenx(pressure, lo1_1sig, hi1_1sig, facecolor="#1873CC",
+                      label=name1+' 1$\sigma$', alpha=0.5, edgecolor="#1873CC")
+    plt.semilogy(med1, pressure, "-", lw=2, label=name1+' Median',color="k")
+    ax1.fill_betweenx(pressure, lo2_2sig, hi2_2sig, facecolor="#ff6a62", 
+                      label=name2+' 2$\sigma$', alpha=0.5, edgecolor="0.5")
+    ax1.fill_betweenx(pressure, lo2_1sig, hi2_1sig, facecolor="#cc3318",
+                      label=name2+' 1$\sigma$', alpha=0.5, edgecolor="#cc3318")
+    plt.semilogy(med2, pressure, "-", lw=2, label=name2+' Median',color="k", 
+                 ls='--')
+    plt.ylim(pressure[0], pressure[-1])
+    plt.legend(loc="best")
+    plt.xlabel("Temperature  (K)", size=15)
+    plt.ylabel("Pressure  (bar)",  size=15)
+    plt.gca().invert_yaxis()
+
+    # save figure
+    if savefile is not None:
+        plt.savefig(savefile)
     plt.close()
 
 

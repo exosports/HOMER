@@ -36,7 +36,7 @@ def make_dir(some_dir):
       if e.errno == 17: # Already exists
         pass
       else:
-        print("Cannot create folder '{:s}'. {:s}.".format(model_dir,
+        print("Cannot create folder '{:s}'. {:s}.".format(some_dir,
                                               os.strerror(e.errno)))
         sys.exit()
     return
