@@ -168,8 +168,8 @@ Neural Network (NN) Parameters
 ------------------------------
 weight_file: str. File containing NN model & weights.
                   NOTE: MUST end in .h5
-input_dim  : int. Dimensionality of the input  to the NN.
-output_dim : int. Dimensionality of the output of the NN.
+inD  : int. Dimensionality of the input  to the NN.
+outD : int. Dimensionality of the output of the NN.
 
 
 MCMC Parameters

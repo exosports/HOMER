@@ -8,11 +8,12 @@ NOTE: Executing this example requires files from the MARGE example!
       Run that first if you wish to run this example.
 
 ********************************** IMPORTANT **********************************
-Recommended specs: Linux
+Requirements:
                    >= 1 core
-                   >= 4 GB RAM
-                   GPU with >= 12 GB RAM
+                   >= 3.5 GB RAM available (recommended system RAM >= 6 GB)
                    >= 1 GB free space
+Recommended:
+                   GPU with >= 4 GB RAM
 
 If using an operating system that is not Linux-based, some aspects of the 
 example will likely need to be adjusted.  Users are encouraged to submit 
