@@ -84,29 +84,32 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwn, ifilt, bestfit,
     -------
     plot of the best-fit model
     """
-    # Get the median, 1, 2, 3sigma models
+    # Get the 1, 2, 3sigma models
     if kll is not None:
-        median = kll.get_quantiles(0.5000)[:, 0]*1e3
-        lo1    = kll.get_quantiles(0.1587)[:, 0]*1e3
-        hi1    = kll.get_quantiles(0.8413)[:, 0]*1e3
-        lo2    = kll.get_quantiles(0.0228)[:, 0]*1e3
-        hi2    = kll.get_quantiles(0.9772)[:, 0]*1e3
-        lo3    = kll.get_quantiles(0.0014)[:, 0]*1e3
-        hi3    = kll.get_quantiles(0.9986)[:, 0]*1e3
-        # The *1e3 factor is for plotting
+        lo1    = kll.get_quantiles(0.1587)[:, 0]
+        hi1    = kll.get_quantiles(0.8413)[:, 0]
+        lo2    = kll.get_quantiles(0.0228)[:, 0]
+        hi2    = kll.get_quantiles(0.9772)[:, 0]
+        lo3    = kll.get_quantiles(0.0014)[:, 0]
+        hi3    = kll.get_quantiles(0.9986)[:, 0]
 
+    # Convert wavenumber --> microns
     if wn:
         xvals  = 1e4/xvals
+    # Set up the x-axis error array
     if ifilt is None:
         xerr = np.zeros((2, len(xvals)))
         xerr[0, 1:  ] = np.abs(xvals[1:  ] - xvals[ :-1])/2
         xerr[1,  :-1] = np.abs(xvals[ :-1] - xvals[1:  ])/2
         xerr[0, 0   ] = xerr[0, 1]
-        xerr[1, 1   ] = xerr[1, 0]
+        xerr[1,-1   ] = xerr[0,-1]
+        xax           = xvals
     else:
         if wn:
             meanwn = 1e4/meanwn
             ifilt = ifilt[:,::-1]
+        xerr = np.abs(xvals[ifilt].T - meanwn)
+        xax  = meanwn
 
     # Plot
     plt.figure(42, dpi=600)
@@ -115,27 +118,17 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwn, ifilt, bestfit,
     if kll is not None:
         ax.fill_between(xvals, lo3, hi3, facecolor="#d9ecff", 
                         edgecolor="#d9ecff", label="3$\sigma$")
-        ax.fill_between(xvals, lo2, hi2, facecolor="#C0DFFF", #62B1FF
+        ax.fill_between(xvals, lo2, hi2, facecolor="#C0DFFF", 
                         edgecolor="#C0DFFF", label="2$\sigma$")
-        ax.fill_between(xvals, lo1, hi1, facecolor="cornflowerblue", #1873CC
+        ax.fill_between(xvals, lo1, hi1, facecolor="cornflowerblue", 
                         edgecolor="cornflowerblue", label="1$\sigma$")
         plt.plot(xvals, median, "royalblue", label="Median")
-    if meanwn is not None:
-        plt.scatter(meanwn, bestfit, c="k", label="Best fit", zorder=30, 
-                    lw=1, s=6)
-        plt.errorbar(meanwn, data, 
-                     yerr=uncert, xerr=np.abs(xvals[ifilt].T - meanwn), 
-                     fmt="or", markersize=1.5, capsize=1.5, elinewidth=1, 
-                     ecolor='tab:red', label="Data", zorder=20)
-    else:
-        plt.scatter(xvals, bestfit, c="k", label="Best fit", zorder=30, 
-                    lw=1, s=6)
-        plt.errorbar(xvals, data, 
-                     yerr=uncert, xerr=xerr, 
-                     fmt="or", markersize=1.5, capsize=1.5, elinewidth=1, 
-                     ecolor='tab:red', label="Data", zorder=20)
+    plt.scatter( xax, bestfit, c="k", label="Best fit", zorder=30, 
+                 lw=1, s=6)
+    plt.errorbar(xax, data, yerr=uncert, xerr=xerr, 
+                 fmt="or", markersize=1.5, capsize=1.5, elinewidth=1, 
+                 ecolor='tab:red', label="Data", zorder=20)
     plt.legend(loc='best')
-    ax.set_xlim(np.amin(xvals), np.amax(xvals))
     ax.set_ylabel(r""+ylabel)
     ax.set_xlabel(r""+xlabel)
     ax.set_xscale('log')

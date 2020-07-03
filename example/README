@@ -48,8 +48,8 @@ navigate there instead.  The paths in some input files will need to be changed
 by the user. 
 
 Execute HOMER:
-  ../HOMER.py example.cfg
+  ../HOMER.py HOMER.cfg
 
-It will begin the retrieval, and should take < 1 hour.
+It will begin the retrieval, and should take on the order of 1 hour.
 
 
