@@ -61,14 +61,17 @@ def eval(params, model,
     -------
     results: array. Integrated predicted values.
     """
+    # Input must be 2D
+    if len(params.shape) == 1:
+        params = np.expand_dims(params, 0)
+
+    # Log-scale
     if ilog:
-        params = np.log10(params)
+        params[:, ilog] = np.log10(params[:, ilog])
+
     # Normalize & scale
     pars = U.scale(U.normalize(params, x_mean, x_std), 
                    x_min, x_max, scalelims)
-    # Input must be 2D
-    if len(pars.shape) == 1:
-        pars = np.expand_dims(pars, 0)
 
     # Predict
     pred = model.predict(pars)
@@ -79,7 +82,8 @@ def eval(params, model,
                          y_mean, y_std)
     # De-log
     if olog:
-        pred = 10**pred
+        pred[:, olog] = 10**pred[:, olog]
+
     # Divide by stellar spectrum
     if starspec is not None:
         pred = pred / starspec
@@ -141,14 +145,17 @@ def eval_binned(params, model,
     -------
     results: array. Integrated predicted values.
     """
+    # Input must be 2D
+    if len(params.shape) == 1:
+        params = np.expand_dims(params, 0)
+
+    # Log-scale
     if ilog:
-        params = np.log10(params)
+        params[:, ilog] = np.log10(params[:, ilog])
+
     # Normalize & scale
     pars = U.scale(U.normalize(params, x_mean, x_std), 
                    x_min, x_max, scalelims)
-    # Input must be 2D
-    if len(pars.shape) == 1:
-        pars = np.expand_dims(pars, 0)
 
     # Predict
     pred = model.predict(pars)
@@ -159,7 +166,8 @@ def eval_binned(params, model,
                          y_mean, y_std)
     # De-log
     if olog:
-        pred = 10**pred
+        pred[:, olog] = 10**pred[:, olog]
+
     # Divide by stellar spectrum
     if starspec is not None:
         pred = pred / starspec
