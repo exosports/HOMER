@@ -158,8 +158,25 @@ def HOMER(cfile):
 
             inD    = conf.getint("inD")
             outD   = conf.getint("outD")
-            ilog   = conf.getboolean("ilog")
-            olog   = conf.getboolean("olog")
+
+            if conf["ilog"] in ["True", "False"]:
+                ilog = conf.getboolean("ilog")
+            elif conf["ilog"] in ["None", "none", ""]:
+                ilog = False
+            elif ',' in conf["ilog"]:
+                ilog = [int(num) for num in conf["ilog"].split(',')]
+            else:
+                ilog = [int(num) for num in conf["ilog"].split()]
+
+            if conf["olog"] in ["True", "False"]:
+                olog = conf.getboolean("olog")
+            elif conf["olog"] in ["None", "none", ""]:
+                olog = False
+            elif ',' in conf["olog"]:
+                olog = [int(num) for num in conf["olog"].split(',')]
+            else:
+                olog = [int(num) for num in conf["olog"].split()]
+
             if os.path.isabs(conf["xvals"]):
                 xvals = np.load(conf["xvals"])
             else:
@@ -267,12 +284,14 @@ def HOMER(cfile):
                               "are less than the corresponding")
                         print("training data minimum.")
                         print("Fix this and try again.")
+                        print("Indices:", np.where(x_min > pmin)[0])
                         sys.exit()
                     if np.any(x_max < pmax):
                         print("One or more maximum values for MCMC params " + \
                               "are more than the corresponding")
                         print("training data maximum.")
                         print("Fix this and try again.")
+                        print("Indices:", np.where(x_max < pmax)[0])
                         sys.exit()
                     if normalize:
                         x_min = U.normalize(x_min, x_mean, x_std)
