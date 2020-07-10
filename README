@@ -31,8 +31,8 @@ network (NN) surrogate model trained by MARGE.  For details on MARGE, see the
 MARGE User Manual at http://planets.ucf.edu/bart-docs/MARGE_user_manual.pdf.
 
 HOMER comes with complete documentation as well as a user manual to assist 
-in its usage.  Users can find the HOMER User Manual at 
-http://planets.ucf.edu/bart-docs/HOMER_user_manual.pdf.
+in its usage.  Users can find the latest HOMER User Manual at 
+https://exosports.github.io/HOMER/doc/HOMER_User_Manual.html.
 
 HOMER is an open-source project that welcomes improvements from the community 
 to be submitted via pull requests on Github.  To be accepted, such improvements 
@@ -142,8 +142,12 @@ Data Normalization Parameters
 -----------------------------
 ilog        : bool. Determines whether the NN takes the logarithm of the 
                     inputs.
+                    Alternatively, specify comma-, space-, or newline-separated 
+                    integers to selectively take the log of certain inputs.
 olog        : bool. Determines whether the NN predicts the log of the 
                     outputs.
+                    Alternatively, specify comma-, space-, or newline-separated 
+                    integers to selectively take the log of certain outputs.
 normalize   : bool. Determines whether to standardize the data by its 
                     mean and standard deviation.
 scale       : bool. Determines whether to scale the data to be within a 

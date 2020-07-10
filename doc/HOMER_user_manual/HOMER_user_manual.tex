@@ -3,7 +3,7 @@
 % Please note this document will be automatically compiled and hosted online
 % after each commit to master. Because of this, renaming or moving the
 % document should be done carefully. To see the compiled document, go to
-% http://planets.ucf.edu/bart-docs/HOMER_user_manual.pdf
+% https://exosports.github.io/HOMER/doc/HOMER_User_Manual.html
 
 \documentclass[letterpaper, 12pt]{article}
 \input{top-HOMER_user_manual}
@@ -70,9 +70,11 @@ Multi-Core Markov Chain Monte Carlo (MC3) code to explore a parameter space
 and determine a posterior distribution of models consistent with the observed 
 data.
 
-The detailed HOMER code documentation and User Manual are provided 
-with the package to assist users in its usage. For additional support, contact 
-the lead author (see Section \ref{sec:team}).
+The detailed HOMER code documentation and User Manual\footnote{A compiled PDF 
+of the latest version of the manual is available at 
+\href{https://exosports.github.io/HOMER/doc/HOMER_User_Manual.html}{https://exosports.github.io/HOMER/doc/HOMER_User_Manual.html}.} 
+are provided with the package to assist users in its usage. 
+For additional support, contact the lead author (see Section \ref{sec:team}).
 
 HOMER is released under the Reproducible Research Software License.  
 For details, see \\
@@ -253,8 +255,12 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
 \begin{itemize}
 \item ilog        : bool. Determines whether the NN takes the logarithm of the 
                           inputs.
+                          Alternatively, specify comma-, space-, or newline-separated 
+                          integers to selectively take the log of certain inputs.
 \item olog        : bool. Determines whether the NN predicts the log of the 
                           outputs.
+                          Alternatively, specify comma-, space-, or newline-separated 
+                          integers to selectively take the log of certain outputs.
 \item normalize   : bool. Determines whether to standardize the data by its 
                           mean and standard deviation.
 \item scale       : bool. Determines whether to scale the data to be within a 
