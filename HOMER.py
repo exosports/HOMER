@@ -39,6 +39,7 @@ try:
     print('Using the datasketches package to calculate ' + \
           'spectra quantiles, if requested.')
 except:
+    ds = False
     print('datasketches package is not available.  Will ' + \
           'not calculate spectra quantiles.')
 
