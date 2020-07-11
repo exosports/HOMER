@@ -10,7 +10,7 @@ NOTE: Executing this example requires files from the MARGE example!
 ********************************** IMPORTANT **********************************
 Requirements:
                    >= 1 core
-                   >= 3.5 GB RAM available (recommended system RAM >= 6 GB)
+                   >= 4 GB RAM available (recommended system RAM >= 6 GB)
                    >= 1 GB free space
 Recommended:
                    GPU with >= 4 GB RAM
@@ -30,7 +30,7 @@ This section will walk the user through executing the example.
 Ensure that the repo's submodules have also been cloned.  
 When cloning HOMER, this can be done by
   git clone --recursive https://github.com/exosports/HOMER HOMER/
-  cd MARGE/
+  cd HOMER/
 Alternatively, if HOMER has already been cloned, pull the submodules by 
 navigating to the HOMER directory and 
   git submodule init
@@ -41,15 +41,19 @@ Next, build MCcubed:
 
 Now, we are ready to begin.
 
-Navigate to the directory where the example files are at.
-  cd example
-If the user has copied these files to another location outside of HOMER, 
-navigate there instead.  The paths in some input files will need to be changed 
-by the user. 
+First, copy the example files to a directory parallel to HOMER and navigate 
+there:
+  mkdir ../run/
+  cp example/* ../run/.
+  cd ../run/
 
-Execute HOMER:
-  ../HOMER.py HOMER.cfg
+If the user opts to use a different directory location, some paths in the 
+config file may need to be changed.
 
-It will begin the retrieval, and should take on the order of 1 hour.
+Now, execute HOMER:
+  ../HOMER/HOMER.py HOMER.cfg
+
+It will begin the retrieval, and should take on the order of 1 hour, depending 
+on CPU/GPU.
 
 
