@@ -164,7 +164,7 @@ def HOMER(cfile):
                 ilog = conf.getboolean("ilog")
             elif conf["ilog"] in ["None", "none", ""]:
                 ilog = False
-            elif conf["ilog"] in [",", " ", "\n"]:
+            elif any(pun in conf["ilog"] for pun in [",", " ", "\n"]):
                 if "," in conf["ilog"]:
                     ilog = [int(num) for num in conf["ilog"].split(',')]
                 else:
@@ -179,7 +179,7 @@ def HOMER(cfile):
                 olog = conf.getboolean("olog")
             elif conf["olog"] in ["None", "none", ""]:
                 olog = False
-            elif conf["olog"] in [",", " ", "\n"]:
+            elif any(pun in conf["olog"] for pun in [",", " ", "\n"]):
                 if "," in conf["olog"]:
                     olog = [int(num) for num in conf["olog"].split(',')]
                 else:
@@ -210,11 +210,18 @@ def HOMER(cfile):
                 pnames = None
             else:
                 pnames = conf['pnames'].split()
-            if conf['postshift'] == '' or conf['postshift'] == 'None':
+
+            if conf['postshift'] in ['', 'None', 'none', 'False', 'false', 'F']:
                 postshift = None
+            elif 'norm' in conf['postshift']:
+                postshift = conf['postshift']
             else:
-                postshift = np.array([float(val) 
-                                      for val in conf['postshift'].split()])
+                try:
+                    postshift = np.array([float(val) 
+                                          for val in conf['postshift'].split()])
+                except:
+                    raise ValueError("Invalid specification for postshift.")
+
             savefile = conf['savefile']
             if savefile != '':
                 savefile = savefile + '_'
@@ -435,7 +442,25 @@ def HOMER(cfile):
 
             # Shift posterior params, if needed (e.g., for units)
             if postshift is not None:
-                outp += np.expand_dims(postshift, -1)
+                if type(postshift) == str:
+                    if 'norm' in postshift:
+                        # Get indices to normalize
+                        ibeg = int(postshift.split('_')[-1].split('-')[0])
+                        iend = int(postshift.split('_')[-1].split('-')[1]) + 1
+                        # Adjust if there are static params
+                        istatic = np.arange(len(pnames))[pstep==0]
+                        for val in istatic:
+                            if val < ibeg:
+                                ibeg -= 1
+                            if val < iend:
+                                iend -= 1
+                        # Adjust posterior
+                        outp[ibeg:iend] = np.log10(10**outp[ibeg:iend] /       \
+                                            np.sum(10**outp[ibeg:iend], axis=0))
+                    else:
+                        raise Exception("Unknown postshift specification.")
+                else:
+                    outp += np.expand_dims(postshift, -1)
 
             # Make plots of posterior
             print('Making plots of the posterior...\n')

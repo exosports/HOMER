@@ -115,6 +115,8 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwn, ifilt, bestfit,
     plt.figure(42, dpi=600)
     plt.clf()
     ax = plt.subplot(111)
+    ymin =  np.inf
+    ymax = -np.inf
     if kll is not None:
         ax.fill_between(xvals, lo3, hi3, facecolor="#d9ecff", 
                         edgecolor="#d9ecff", label="3$\sigma$")
@@ -123,19 +125,24 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwn, ifilt, bestfit,
         ax.fill_between(xvals, lo1, hi1, facecolor="cornflowerblue", 
                         edgecolor="cornflowerblue", label="1$\sigma$")
         plt.plot(xvals, median, "royalblue", label="Median")
+        ymin = np.amin([ymin, lo3.min()])
+        ymax = np.amax([ymax, hi3.max()])
     plt.scatter( xax, bestfit, c="k", label="Best fit", zorder=30, 
                  lw=1, s=6)
     plt.errorbar(xax, data, yerr=uncert, xerr=xerr, 
                  fmt="or", markersize=1.5, capsize=1.5, elinewidth=1, 
                  ecolor='tab:red', label="Data", zorder=20)
+    ymin = np.amin([ymin, data.min()-uncert.max(), bestfit.min()-uncert.max()])
+    ymax = np.amax([ymax, data.max()+uncert.max(), bestfit.max()+uncert.max()])
     plt.legend(loc='best')
+    plt.ylim(ymin, ymax)
     ax.set_ylabel(r""+ylabel)
     ax.set_xlabel(r""+xlabel)
     ax.set_xscale('log')
     formatter = tck.FuncFormatter(lambda y, _: '{:.8g}'.format(y))
     ax.get_xaxis().set_major_formatter(formatter)
     ax.get_xaxis().set_minor_formatter(formatter)
-    plt.savefig(outputdir+'bestfit_spectrum.png')
+    plt.savefig(outputdir+'bestfit_spectrum.png', bbox_inches='tight')
     plt.close()
 
 
