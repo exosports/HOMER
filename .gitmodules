@@ -1,7 +1,3 @@
-[submodule "modules/MCcubed"]
-	path = modules/MCcubed
-	url = https://github.com/mdhimes/mc3
 [submodule "modules/datasketches"]
 	path = modules/datasketches
 	url = https://github.com/mdhimes/incubator-datasketches-cpp
-
