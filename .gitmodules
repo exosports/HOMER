@@ -1,3 +1,6 @@
 [submodule "modules/datasketches"]
 	path = modules/datasketches
 	url = https://github.com/mdhimes/incubator-datasketches-cpp
+[submodule "modules/LISA"]
+	path = modules/LISA
+	url = https://github.com/mdhimes/LISA.git

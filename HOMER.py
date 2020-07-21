@@ -8,6 +8,7 @@ import sys, os
 import configparser
 import importlib
 import pickle
+import functools
 import numpy as np
 import scipy.interpolate as si
 
@@ -23,16 +24,14 @@ import compost   as C
 import utils     as U
 import mcmcplots as P
 
-mc3dir = os.path.dirname(__file__) + '/modules/MCcubed'
-sys.path.append(mc3dir)
-mccdir = os.path.dirname(__file__) + '/modules/MCcubed/MCcubed'
-sys.path.append(mccdir)
-mcpdir = os.path.dirname(__file__) + '/modules/MCcubed/MCcubed/plots'
+moddir = os.path.dirname(__file__) + '/modules'
+lisadir = moddir + '/LISA/'
+sys.path.append(lisadir)
+import LISA
+
+mcpdir = os.path.join(lisadir, 'modules', 'MCcubed', 'MCcubed', 'plots')
 sys.path.append(mcpdir)
 import mcplots as mcp
-mcmcdir = os.path.dirname(__file__) + '/modules/MCcubed/MCcubed/mc'
-sys.path.append(mcmcdir)
-import MCcubed as mc3
 
 try:
     import datasketches as ds
@@ -68,6 +67,7 @@ def HOMER(cfile):
             conf = config[section]
             ### Unpack the variables ###
             # Top-level params
+            alg        = conf["alg"]
             onlyplot   = conf.getboolean("onlyplot")
             compost    = conf.getboolean("compost")
             normalize  = conf.getboolean("normalize")
@@ -373,43 +373,75 @@ def HOMER(cfile):
             fsavefile  = outputdir + savefile + 'output.npy'
             fsavemodel = outputdir + savefile + 'output_model.npy'
             fsavesks   = outputdir + 'sketches.pickle'
+            fposterior = outputdir + 'output_posterior.npy'
+            fbestp     = outputdir + 'output_bestp.npy'
             if not onlyplot:
                 # Instantiate model
                 print('\nBuilding model...\n')
                 nn = NN.NNModel(weight_file)
 
-                # Run the MCMC
-                if flog is not None:
-                    logfile = open(flog, 'w')
-                else:
-                    logfile = None
-                count = np.array([0]) # to determine when to begin updating sketches
-                outp, bestp = mc3.mc.mcmc(data, uncert, func=func, 
-                                          indparams=[nn, 
-                                                     x_mean, x_std, 
-                                                     y_mean, y_std, 
-                                                     x_min, x_max, 
-                                                     y_min, y_max, 
-                                                     scalelims, 
-                                                     xvals*wnfact,
-                                                     starspec, factor, 
-                                                     filttran, ifilt, 
-                                                     ilog, olog, 
-                                                     kll, count, burnin],
-                                          parnames=pnames, params=pinit, 
-                                          pmin=pmin, pmax=pmax, stepsize=pstep,
-                                          numit=niter, burnin=burnin, 
-                                          nchains=nchains, 
-                                          walk='snooker', hsize=4*nchains, 
-                                          plots=False, leastsq=False, 
-                                          log=logfile, 
-                                          savefile =fsavefile,
-                                          savemodel=fsavemodel)
-                if flog is not None:
-                    logfile.close()
-                # NOTE! hsize has the hard-coded value to ensure that the 
-                # parameter space is adequately seeded with models to speed up 
-                # exploration
+                # Pack the parameters
+                if alg in ['snooker', 'demc']:
+                    model = functools.partial(func, nn=nn, 
+                                                    ilog=ilog, olog=olog, 
+                                                    x_mean=x_mean, x_std=x_std, 
+                                                    y_mean=y_mean, y_std=y_std, 
+                                                    x_min=x_min, x_max=x_max, 
+                                                    y_min=y_min, y_max=y_max, 
+                                                    scalelims=scalelims)
+                    count = np.array([0]) # to determine when to update sketches
+                    indparams = [nn, 
+                                 x_mean, x_std, y_mean, y_std, 
+                                 x_min, x_max, y_min, y_max, scalelims, 
+                                 xvals*wnfact, starspec, factor, 
+                                 filttran, ifilt, ilog, olog, 
+                                 kll, count, burnin]
+                    params = {"data"      : data     , "uncert"     : uncert, 
+                              "func"      : func     , "indparams"  : indparams, 
+                              "pnames"    : pnames   , "pinit"      : pinit, 
+                              "pmin"      : pmin     , "pmax"       : pmax, 
+                              "pstep"     : pstep    , "niter"      : niter, 
+                              "burnin"    : burnin   , "thinning"   : thinning, 
+                              "nchains"   : nchains  , "hsize"      : 4*nchains, 
+                              "savefile"  : savefile , "outputdir"  : outputdir, 
+                              "fsavefile" : fsavefile, "fsavemodel" : fsavemodel, 
+                              "flog"      : flog}
+
+                elif alg in ['multinest', 'ultranest']:
+                    nchains = 1
+                    # Set static variables for `func`
+                    model = functools.partial(func, nn=nn, inD=inD, 
+                                                    pstep=pstep, pinit=pinit, 
+                                                    ilog=ilog, olog=olog, 
+                                                    x_mean=x_mean, x_std=x_std, 
+                                                    y_mean=y_mean, y_std=y_std, 
+                                                    x_min=x_min, x_max=x_max, 
+                                                    y_min=y_min, y_max=y_max, 
+                                                    scalelims=scalelims)
+
+                    def prior(cube, ndim=np.sum(pstep>0), nparams=len(pnames)):
+                        cube = cube.copy()
+                        # Cube begins as [0,1] interval -- scale to [pmin, pmax]
+                        for i in range(ndim):
+                            cube[i] = cube[i]                                 \
+                                      * (pmax[pstep>0][i] - pmin[pstep>0][i]) \
+                                      +  pmin[pstep>0][i]
+                        return cube
+
+                    def loglike(cube, ndim=np.sum(pstep>0), nparams=len(pnames)):
+                        ymodel = model(cube)
+                        loglikelihood = (-0.5 * ((ymodel - data) / uncert)**2).sum()
+                        return loglikelihood
+
+                    params = {"prior"     : prior    , "loglike" : loglike, 
+                              "pnames"    : pnames   , "pstep"   : pstep, 
+                              "outputdir" : outputdir}
+                # Call LISA
+                outp, bestp = LISA.run(alg, params)
+
+                # Save out the arrays
+                np.save(fposterior, outp )
+                np.save(fbestp    , bestp)
 
                 # Serialize and save the sketches, in case needing to replot
                 if kll is not None:
@@ -425,22 +457,26 @@ def HOMER(cfile):
                     except:
                         print("No sketch file found.  Will not plot quantiles.")
                 # Load posterior, shape (nchains, nfree, niterperchain)
-                outpc = np.load(fsavefile)
+                #outpc = np.load(fsavefile)
                 # Stack it to be (nfree, niter), remove burnin
-                outp = outpc[0, :, burnin:]
-                for c in range(1, nchains):
-                    outp = np.hstack((outp, outpc[c, :, burnin:]))
-                del outpc
+                #outp = outpc[0, :, burnin:]
+                #for c in range(1, nchains):
+                #    outp = np.hstack((outp, outpc[c, :, burnin:]))
+                #del outpc
+                outp  = np.load(fposterior)
+                bestp = np.load(fbestp)
+
+            bestfit = model(bestp)
 
             # Load the evaluated models & stack, excluding burnin
-            evalmodels = np.load(fsavemodel)
-            allmodel   = evalmodels[0,:,burnin:]
-            for c in range(1, nchains):
-                allmodel = np.hstack((allmodel, evalmodels[c, :, burnin:]))
+            #evalmodels = np.load(fsavemodel)
+            #allmodel   = evalmodels[0,:,burnin:]
+            #for c in range(1, nchains):
+            #    allmodel = np.hstack((allmodel, evalmodels[c, :, burnin:]))
 
             # Plot best-fit model
             print("\nPlotting best-fit model...\n")
-            bestfit = BF.get_bestfit(allmodel, outp, flog, pstep>0)
+            #bestfit = BF.get_bestfit(allmodel, outp, flog, pstep>0)
             BF.plot_bestfit(outputdir, xvals, data, uncert, meanwn, ifilt, 
                             bestfit, xlabel, ylabel, kll, wn)
 
@@ -471,18 +507,18 @@ def HOMER(cfile):
             pnames = np.asarray(pnames)
             mcp.trace(outp, parname=pnames[pstep>0], thinning=thinning, 
                       sep=np.size(outp[0]//nchains), 
-                      savefile=outputdir+savefile+"MCMC_trace.png")
+                      savefile=outputdir+savefile+"LISA_trace.png")
             mcp.histogram(outp, parname=pnames[pstep>0], thinning=thinning, 
-                          savefile=outputdir+savefile+"MCMC_posterior.png")
+                          savefile=outputdir+savefile+"LISA_posterior.png")
             mcp.pairwise(outp, parname=pnames[pstep>0], thinning=thinning, 
-                         savefile=outputdir+savefile+"MCMC_pairwise.png")
+                         savefile=outputdir+savefile+"LISA_pairwise.png")
 
             # PT profiles
             if plot_PT:
                 print("Plotting PT profiles...\n")
                 pressure = np.loadtxt(inputdir + fpress, skiprows=1)[:,1]
                 P.mcmc_pt(outp[:5], pressure, PTargs, 
-                          savefile=outputdir+savefile+"MCMC_PT.png")
+                          savefile=outputdir+savefile+"LISA_PT.png")
 
             # Format parameter names, and find maximum length
             parname = []
