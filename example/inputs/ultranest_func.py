@@ -106,16 +106,17 @@ def model(pars, nn, inD, pstep, pinit,
     return out
 
 
-def prior(cube, ndim, nparams, pmin, pmax, pstep):
+def prior(cube, pmin, pmax, pstep):
+    cube = cube.copy()
     # Cube begins as [0,1] interval -- scale to [pmin, pmax]
-    for i in range(ndim):
+    for i in range(cube.shape[0]):
         cube[i] = cube[i]                                 \
                   * (pmax[pstep>0][i] - pmin[pstep>0][i]) \
                   +  pmin[pstep>0][i]
     return cube
 
 
-def loglikelihood(cube, ndim, nparams, data, uncert, 
+def loglikelihood(cube, data, uncert, 
                   nn, inD, pstep, pinit, 
                   ilog, olog, 
                   x_mean, x_std, x_min, x_max, 

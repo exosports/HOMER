@@ -7,6 +7,7 @@ Driver for HOMER
 import sys, os
 import configparser
 import importlib
+import copy
 import pickle
 import functools
 import numpy as np
@@ -32,6 +33,8 @@ import LISA
 mcpdir = os.path.join(lisadir, 'modules', 'MCcubed', 'MCcubed', 'plots')
 sys.path.append(mcpdir)
 import mcplots as mcp
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 try:
     import datasketches as ds
@@ -419,8 +422,26 @@ def HOMER(cfile):
                                                     y_min=y_min, y_max=y_max, 
                                                     scalelims=scalelims)
 
+                    pr = importlib.import_module(f[1]).__getattribute__('prior')
+                    ll = importlib.import_module(f[1]).__getattribute__('loglikelihood')
+
+                    prior   = functools.partial(pr, pmin=pmin, pmax=pmax, 
+                                                    pstep=pstep)
+                    loglike = functools.partial(ll, data=data, uncert=uncert, 
+                                                    nn=nn, inD=inD, 
+                                                    pstep=pstep, pinit=pinit, 
+                                                    ilog=ilog, olog=olog, 
+                                                    x_mean=x_mean, x_std=x_std, 
+                                                    y_mean=y_mean, y_std=y_std, 
+                                                    x_min=x_min, x_max=x_max, 
+                                                    y_min=y_min, y_max=y_max, 
+                                                    scalelims=scalelims)
+                    prior.__name__ = 'prior'
+                    loglike.__name__ = 'loglike'
+                    """
                     def prior(cube, ndim=np.sum(pstep>0), nparams=len(pnames)):
-                        cube = cube.copy()
+                        #cube = cube.copy()
+                        cube = copy.copy(cube)
                         # Cube begins as [0,1] interval -- scale to [pmin, pmax]
                         for i in range(ndim):
                             cube[i] = cube[i]                                 \
@@ -432,7 +453,7 @@ def HOMER(cfile):
                         ymodel = model(cube)
                         loglikelihood = (-0.5 * ((ymodel - data) / uncert)**2).sum()
                         return loglikelihood
-
+                    """
                     params = {"prior"     : prior    , "loglike" : loglike, 
                               "pnames"    : pnames   , "pstep"   : pstep, 
                               "outputdir" : outputdir}
