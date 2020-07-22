@@ -34,7 +34,6 @@ mcpdir = os.path.join(lisadir, 'modules', 'MCcubed', 'MCcubed', 'plots')
 sys.path.append(mcpdir)
 import mcplots as mcp
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 try:
     import datasketches as ds
