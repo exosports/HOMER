@@ -34,6 +34,7 @@ mcpdir = os.path.join(lisadir, 'modules', 'MCcubed', 'MCcubed', 'plots')
 sys.path.append(mcpdir)
 import mcplots as mcp
 
+#os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 try:
     import datasketches as ds
@@ -342,6 +343,10 @@ def HOMER(cfile):
                 filttran = []
                 ifilt = np.zeros((len(filters), 2), dtype=int)
                 meanwn = []
+                if wn:
+                    xwn = xvals
+                else:
+                    xwn = 10000. / (filt2um * xvals)[::-1]
                 for i in range(len(filters)):
                     datfilt = np.loadtxt(filters[i])
                     # Convert filter wavelenths to microns, then convert um -> cm-1
@@ -349,20 +354,24 @@ def HOMER(cfile):
                                           datfilt[:,1],
                                           bounds_error=False, fill_value=0)
                     # Interpolate and normalize
-                    tranfilt = finterp(xvals)
-                    tranfilt = tranfilt / np.trapz(tranfilt, xvals)
-                    meanwn.append(np.sum(xvals*tranfilt)/sum(tranfilt))
+                    tranfilt = finterp(xwn)
+                    tranfilt = tranfilt / np.trapz(tranfilt, xwn)
+                    if not wn:
+                        tranfilt = tranfilt[::-1]
+                    meanwn.append(np.sum(xwn*tranfilt)/sum(tranfilt))
                     # Find non-zero indices for faster integration
                     nonzero = np.where(tranfilt!=0)
                     ifilt[i, 0] = max(nonzero[0][ 0] - 1, 0)
-                    ifilt[i, 1] = min(nonzero[0][-1] + 1, len(xvals)-1)
+                    ifilt[i, 1] = min(nonzero[0][-1] + 1, len(xwn)-1)
                     filttran.append(tranfilt[ifilt[i,0]:ifilt[i,1]]) # Store filter
 
-                meanwn = np.asarray(meanwn)
+                meanwave = np.asarray(meanwn)
+                if not wn:
+                    meanwave = 10000./meanwave[::-1]
             else:
                 ifilt    = None
                 filttran = None
-                meanwn   = None
+                meanwave = None
 
             ### Check if datasketches is available ###
             if ds and quantiles:
@@ -377,85 +386,72 @@ def HOMER(cfile):
             fsavesks   = outputdir + 'sketches.pickle'
             fposterior = outputdir + 'output_posterior.npy'
             fbestp     = outputdir + 'output_bestp.npy'
+
+            # Instantiate model
+            print('\nBuilding model...\n')
+            nn = NN.NNModel(weight_file)
+
+            # Pack the parameters
+            if alg in ['snooker', 'demc']:
+                model = functools.partial(func, nn=nn, 
+                                                ilog=ilog, olog=olog, 
+                                                x_mean=x_mean, x_std=x_std, 
+                                                y_mean=y_mean, y_std=y_std, 
+                                                x_min=x_min, x_max=x_max, 
+                                                y_min=y_min, y_max=y_max, 
+                                                scalelims=scalelims)
+                count = np.array([0]) # to determine when to update sketches
+                indparams = [nn, 
+                             x_mean, x_std, y_mean, y_std, 
+                             x_min, x_max, y_min, y_max, scalelims, 
+                             xvals*wnfact, starspec, factor, 
+                             filttran, ifilt, ilog, olog, 
+                             kll, count, burnin]
+                params = {"data"      : data     , "uncert"     : uncert, 
+                          "func"      : func     , "indparams"  : indparams, 
+                          "pnames"    : pnames   , "pinit"      : pinit, 
+                          "pmin"      : pmin     , "pmax"       : pmax, 
+                          "pstep"     : pstep    , "niter"      : niter, 
+                          "burnin"    : burnin   , "thinning"   : thinning, 
+                          "nchains"   : nchains  , "hsize"      : 4*nchains, 
+                          "savefile"  : savefile , "outputdir"  : outputdir, 
+                          "fsavefile" : fsavefile, "fsavemodel" : fsavemodel, 
+                          "flog"      : flog}
+
+            elif alg in ['multinest', 'ultranest']:
+                nchains = 1
+                # Set static variables for `func`
+                model = functools.partial(func, nn=nn, inD=inD, 
+                                                pstep=pstep, pinit=pinit, 
+                                                ilog=ilog, olog=olog, 
+                                                x_mean=x_mean, x_std=x_std, 
+                                                y_mean=y_mean, y_std=y_std, 
+                                                x_min=x_min, x_max=x_max, 
+                                                y_min=y_min, y_max=y_max, 
+                                                scalelims=scalelims)
+
+                pr = importlib.import_module(f[1]).__getattribute__('prior')
+                ll = importlib.import_module(f[1]).__getattribute__('loglikelihood')
+
+                prior   = functools.partial(pr, pmin=pmin, pmax=pmax, 
+                                                pstep=pstep)
+                loglike = functools.partial(ll, data=data, uncert=uncert, 
+                                                nn=nn, inD=inD, 
+                                                pstep=pstep, pinit=pinit, 
+                                                ilog=ilog, olog=olog, 
+                                                x_mean=x_mean, x_std=x_std, 
+                                                y_mean=y_mean, y_std=y_std, 
+                                                x_min=x_min, x_max=x_max, 
+                                                y_min=y_min, y_max=y_max, 
+                                                scalelims=scalelims)
+                prior.__name__ = 'prior'
+                loglike.__name__ = 'loglike'
+                params = {"prior"     : prior    , "loglike" : loglike, 
+                          "pnames"    : pnames   , "pstep"   : pstep, 
+                          "outputdir" : outputdir, "kll"     : kll, 
+                          "model"     : model}
+
             if not onlyplot:
-                # Instantiate model
-                print('\nBuilding model...\n')
-                nn = NN.NNModel(weight_file)
-
-                # Pack the parameters
-                if alg in ['snooker', 'demc']:
-                    model = functools.partial(func, nn=nn, 
-                                                    ilog=ilog, olog=olog, 
-                                                    x_mean=x_mean, x_std=x_std, 
-                                                    y_mean=y_mean, y_std=y_std, 
-                                                    x_min=x_min, x_max=x_max, 
-                                                    y_min=y_min, y_max=y_max, 
-                                                    scalelims=scalelims)
-                    count = np.array([0]) # to determine when to update sketches
-                    indparams = [nn, 
-                                 x_mean, x_std, y_mean, y_std, 
-                                 x_min, x_max, y_min, y_max, scalelims, 
-                                 xvals*wnfact, starspec, factor, 
-                                 filttran, ifilt, ilog, olog, 
-                                 kll, count, burnin]
-                    params = {"data"      : data     , "uncert"     : uncert, 
-                              "func"      : func     , "indparams"  : indparams, 
-                              "pnames"    : pnames   , "pinit"      : pinit, 
-                              "pmin"      : pmin     , "pmax"       : pmax, 
-                              "pstep"     : pstep    , "niter"      : niter, 
-                              "burnin"    : burnin   , "thinning"   : thinning, 
-                              "nchains"   : nchains  , "hsize"      : 4*nchains, 
-                              "savefile"  : savefile , "outputdir"  : outputdir, 
-                              "fsavefile" : fsavefile, "fsavemodel" : fsavemodel, 
-                              "flog"      : flog}
-
-                elif alg in ['multinest', 'ultranest']:
-                    nchains = 1
-                    # Set static variables for `func`
-                    model = functools.partial(func, nn=nn, inD=inD, 
-                                                    pstep=pstep, pinit=pinit, 
-                                                    ilog=ilog, olog=olog, 
-                                                    x_mean=x_mean, x_std=x_std, 
-                                                    y_mean=y_mean, y_std=y_std, 
-                                                    x_min=x_min, x_max=x_max, 
-                                                    y_min=y_min, y_max=y_max, 
-                                                    scalelims=scalelims)
-
-                    pr = importlib.import_module(f[1]).__getattribute__('prior')
-                    ll = importlib.import_module(f[1]).__getattribute__('loglikelihood')
-
-                    prior   = functools.partial(pr, pmin=pmin, pmax=pmax, 
-                                                    pstep=pstep)
-                    loglike = functools.partial(ll, data=data, uncert=uncert, 
-                                                    nn=nn, inD=inD, 
-                                                    pstep=pstep, pinit=pinit, 
-                                                    ilog=ilog, olog=olog, 
-                                                    x_mean=x_mean, x_std=x_std, 
-                                                    y_mean=y_mean, y_std=y_std, 
-                                                    x_min=x_min, x_max=x_max, 
-                                                    y_min=y_min, y_max=y_max, 
-                                                    scalelims=scalelims)
-                    prior.__name__ = 'prior'
-                    loglike.__name__ = 'loglike'
-                    """
-                    def prior(cube, ndim=np.sum(pstep>0), nparams=len(pnames)):
-                        #cube = cube.copy()
-                        cube = copy.copy(cube)
-                        # Cube begins as [0,1] interval -- scale to [pmin, pmax]
-                        for i in range(ndim):
-                            cube[i] = cube[i]                                 \
-                                      * (pmax[pstep>0][i] - pmin[pstep>0][i]) \
-                                      +  pmin[pstep>0][i]
-                        return cube
-
-                    def loglike(cube, ndim=np.sum(pstep>0), nparams=len(pnames)):
-                        ymodel = model(cube)
-                        loglikelihood = (-0.5 * ((ymodel - data) / uncert)**2).sum()
-                        return loglikelihood
-                    """
-                    params = {"prior"     : prior    , "loglike" : loglike, 
-                              "pnames"    : pnames   , "pstep"   : pstep, 
-                              "outputdir" : outputdir}
                 # Call LISA
                 outp, bestp = LISA.run(alg, params)
 
@@ -476,28 +472,14 @@ def HOMER(cfile):
                             kll.deserialize(desers[i], i)
                     except:
                         print("No sketch file found.  Will not plot quantiles.")
-                # Load posterior, shape (nchains, nfree, niterperchain)
-                #outpc = np.load(fsavefile)
-                # Stack it to be (nfree, niter), remove burnin
-                #outp = outpc[0, :, burnin:]
-                #for c in range(1, nchains):
-                #    outp = np.hstack((outp, outpc[c, :, burnin:]))
-                #del outpc
                 outp  = np.load(fposterior)
                 bestp = np.load(fbestp)
 
             bestfit = model(bestp)
 
-            # Load the evaluated models & stack, excluding burnin
-            #evalmodels = np.load(fsavemodel)
-            #allmodel   = evalmodels[0,:,burnin:]
-            #for c in range(1, nchains):
-            #    allmodel = np.hstack((allmodel, evalmodels[c, :, burnin:]))
-
             # Plot best-fit model
             print("\nPlotting best-fit model...\n")
-            #bestfit = BF.get_bestfit(allmodel, outp, flog, pstep>0)
-            BF.plot_bestfit(outputdir, xvals, data, uncert, meanwn, ifilt, 
+            BF.plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, 
                             bestfit, xlabel, ylabel, kll, wn)
 
             # Shift posterior params, if needed (e.g., for units)
