@@ -76,7 +76,8 @@ def denormalize(val, vmean, vstd):
 def model(pars, nn, inD, pstep, pinit, 
           ilog, olog, 
           x_mean, x_std, x_min, x_max, 
-          y_mean, y_std, y_min, y_max, scalelims):
+          y_mean, y_std, y_min, y_max, scalelims,
+          fullout=False):
     # Load params
     params = np.zeros(inD, dtype=float)
     n = 0
@@ -98,12 +99,15 @@ def model(pars, nn, inD, pstep, pinit,
     if olog:
         pred[:, olog] = 10**pred[:, olog]
 
-    out = 0
-    for i in range(46):
-        out += pred[:, i::46]
-    out /= 46.
+    if not fullout:
+        out = 0
+        for i in range(46):
+            out += pred[:, i::46]
+        out /= 46.
 
-    return out
+        return out
+    else:
+        return pred
 
 
 def prior(cube, ndim, nparams, pmin, pmax, pstep):
