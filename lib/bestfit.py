@@ -37,6 +37,7 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
     -------
     plot of the best-fit model
     """
+    pad = 1.04 # to pad the edges of the plot
     # Get the 1, 2, 3sigma models
     if kll is not None:
         lo1    = kll.get_quantiles(0.1587)[:, 0]
@@ -64,6 +65,8 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
         xerr = np.abs(xvals[ifilt].T - meanwave)
         xax  = meanwave
 
+    xlims = np.amin(meanwave)-pad*xerr[0,0], np.amax(meanwave)+pad*xerr[-1,-1]
+
     # Plot
     fig1 = plt.figure(42, dpi=600)
     plt.clf()
@@ -79,26 +82,27 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
                         edgecolor="#C0DFFF", label="2$\sigma$")
         ax.fill_between(xvals, lo1, hi1, facecolor="cornflowerblue", 
                         edgecolor="cornflowerblue", label="1$\sigma$")
-        ymin = np.amin([ymin, lo3.min()])
-        ymax = np.amax([ymax, hi3.max()])
+        ymin = np.amin([ymin, lo3.min()-0.01*lo3.min()])
+        ymax = np.amax([ymax, hi3.max()+0.01*hi3.min()])
     # Best fit plot
-    plt.scatter( xax, bestfit, c="k", label="Best fit", zorder=90, 
+    ax.scatter( xax, bestfit, c="k", label="Best fit", zorder=90, 
                 lw=1, s=6)
-    plt.errorbar(xax, data, yerr=uncert, xerr=xerr, 
+    ax.errorbar(xax, data, yerr=uncert, xerr=xerr, 
                 fmt="or", markersize=1.5, capsize=1.5, elinewidth=1, 
                 ecolor='tab:red', label="Data", zorder=80)
-    ymin = np.amin([ymin, data.min()-uncert.max(), bestfit.min()-uncert.max()])
-    ymax = np.amax([ymax, data.max()+uncert.max(), bestfit.max()+uncert.max()])
+    ymin = np.amin([ymin, data.min()-pad*uncert.max(), bestfit.min()-pad*uncert.max()])
+    ymax = np.amax([ymax, data.max()+pad*uncert.max(), bestfit.max()+pad*uncert.max()])
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.ylim(ymin, ymax)
-    xlims = plt.xlim()
+    plt.xlim(*xlims)
     ax.set_ylabel(r""+ylabel)
     ax.set_xscale('log')
-    ax.set_xticklabels([])
+    for label in ax.xaxis.get_ticklabels(which='both'):
+        label.set_visible(False)
     # Residuals
     ax2 = fig1.add_axes((.1, .1, .8, .2))
     resid  = data - bestfit
-    ax2.scatter(xax, resid, s=0.5, label='Full resolution', c='b')
+    ax2.scatter(xax, resid, s=0.8, label='Full resolution', c='b')
     plt.hlines(0, xlims[0], xlims[1])
     yticks = ax2.yaxis.get_major_ticks()
     #yticks[-1].label.set_visible(False)
@@ -121,6 +125,7 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
             digit = int(label.get_text().replace('0','').replace('.','')[0])
             if digit%2 == 1:
                 label.set_visible(False)
+    plt.xlim(*xlims)
     # Histogram of residuals
     '''
     ax3 = fig1.add_axes((0.9, .1, .1, .2))
@@ -133,5 +138,6 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
     '''
     plt.savefig(outputdir+'bestfit_spectrum.png', bbox_inches='tight')
     plt.close()
+    sys.exit()
 
 

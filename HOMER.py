@@ -356,18 +356,18 @@ def HOMER(cfile):
                     # Interpolate and normalize
                     tranfilt = finterp(xwn)
                     tranfilt = tranfilt / np.trapz(tranfilt, xwn)
+                    meanwn.append(np.sum(xwn*tranfilt)/sum(tranfilt))
                     if not wn:
                         tranfilt = tranfilt[::-1]
-                    meanwn.append(np.sum(xwn*tranfilt)/sum(tranfilt))
                     # Find non-zero indices for faster integration
                     nonzero = np.where(tranfilt!=0)
                     ifilt[i, 0] = max(nonzero[0][ 0] - 1, 0)
-                    ifilt[i, 1] = min(nonzero[0][-1] + 1, len(xwn)-1)
+                    ifilt[i, 1] = min(nonzero[0][-1] + 2, len(xwn)-1)
                     filttran.append(tranfilt[ifilt[i,0]:ifilt[i,1]]) # Store filter
 
                 meanwave = np.asarray(meanwn)
                 if not wn:
-                    meanwave = 10000./meanwave[::-1]
+                    meanwave = 10000./meanwave
             else:
                 ifilt    = None
                 filttran = None
@@ -428,7 +428,10 @@ def HOMER(cfile):
                                                 y_mean=y_mean, y_std=y_std, 
                                                 x_min=x_min, x_max=x_max, 
                                                 y_min=y_min, y_max=y_max, 
-                                                scalelims=scalelims)
+                                                scalelims=scalelims, 
+                                                xvals=xvals, 
+                                                filters=filttran, 
+                                                ifilt=ifilt)
 
                 pr = importlib.import_module(f[1]).__getattribute__('prior')
                 ll = importlib.import_module(f[1]).__getattribute__('loglikelihood')
@@ -443,7 +446,10 @@ def HOMER(cfile):
                                                 y_mean=y_mean, y_std=y_std, 
                                                 x_min=x_min, x_max=x_max, 
                                                 y_min=y_min, y_max=y_max, 
-                                                scalelims=scalelims)
+                                                scalelims=scalelims, 
+                                                xvals=xvals, 
+                                                filters=filttran, 
+                                                ifilt=ifilt)
                 prior.__name__ = 'prior'
                 loglike.__name__ = 'loglike'
                 params = {"prior"     : prior    , "loglike" : loglike, 
