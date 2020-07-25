@@ -138,6 +138,5 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
     '''
     plt.savefig(outputdir+'bestfit_spectrum.png', bbox_inches='tight')
     plt.close()
-    sys.exit()
 
 
