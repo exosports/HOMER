@@ -259,6 +259,22 @@ def HOMER(cfile):
             except:
                 perc = np.array([0.6827, 0.9545, 0.9973])
 
+            # Get the true parameters, if given
+            truepars = conf["truepars"]
+            if conf["truepars"] in ["", "None", "none", "False", "false"]:
+                truepars = None
+            else:
+                if '.npy' in conf["truepars"]:
+                    truepars = np.load(conf["truepars"])
+                    if len(truepars) > inD:
+                        truepars = truepars[:inD]
+                else:
+                    truepars = np.array([float(val) 
+                                         for val in conf["truepars"].split()])
+                if ilog:
+                    truepars[ilog] = np.log10(truepars[ilog])
+                truepars = truepars[pstep>0]
+
             # Check sizes
             if np.any(np.array([len(pinit), len(pstep), 
                                 len(pmin),  len(pmax)  ]) != inD):
@@ -515,11 +531,14 @@ def HOMER(cfile):
             pnames = np.asarray(pnames)
             mcp.trace(outp, parname=pnames[pstep>0], thinning=thinning, 
                       sep=np.size(outp[0]//nchains), 
-                      savefile=outputdir+savefile+"LISA_trace.png")
+                      savefile=outputdir+savefile+"LISA_trace.png", 
+                      truepars=truepars)
             mcp.histogram(outp, parname=pnames[pstep>0], thinning=thinning, 
-                          savefile=outputdir+savefile+"LISA_posterior.png")
+                          savefile=outputdir+savefile+"LISA_posterior.png", 
+                          truepars=truepars, credreg=True)
             mcp.pairwise(outp, parname=pnames[pstep>0], thinning=thinning, 
-                         savefile=outputdir+savefile+"LISA_pairwise.png")
+                         savefile=outputdir+savefile+"LISA_pairwise.png", 
+                         truepars=truepars, credreg=True)
 
             # PT profiles
             if plot_PT:
