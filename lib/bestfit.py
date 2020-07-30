@@ -120,12 +120,12 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
         lbls.append(label.get_text())
     lbls = np.asarray(lbls).astype(float)
     loglbls = np.round(np.log10(lbls))
-    if loglbls[-1] - loglbls[0] > 2 and loglbls[-1] - loglbls[0] < 4:
+    if loglbls[-1] - loglbls[0] >= 2 and loglbls[-1] - loglbls[0] <= 5:
         for label in ax2.xaxis.get_ticklabels(minor=True):
             digit = int(label.get_text().replace('0','').replace('.','')[0])
             if digit%2 == 1:
                 label.set_visible(False)
-    elif loglbls[-1] - loglbls[0] >= 4:
+    elif loglbls[-1] - loglbls[0] > 5:
         for label in ax2.xaxis.get_ticklabels(minor=True):
             digit = int(label.get_text().replace('0','').replace('.','')[0])
             if digit%5 > 0:
