@@ -11,7 +11,8 @@ plt.ion()
 
 
 def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit, 
-                 xlabel, ylabel, kll=None, wn=True):
+                 xlabel, ylabel, kll=None, wn=True, 
+                 bestpars=None, truepars=None, title=False, ndec=None):
     """
     Plots the best-fit model.
 
@@ -32,6 +33,15 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
     ylabel  : string. Y-axis label.
     kll     : object. Streaming quantiles calculator, for 1-2-3 sigma spectra.
     wn      : bool.   Determines if `xvals` is in wavenumber or wavelength.
+    bestpars: array.  If None, will not be used.  Otherwise, array of best-fit 
+                      parameter values.  If title is True, they will be 
+                      included in the title.
+    truepars: array.  If None, will not be used.  Otherwise, array of true 
+                      values.  If title is True, they will be 
+                      included in the title.
+    title   : bool.   If False, does not plot title. 
+                      If True, plots the best-fit parameters as the title.
+    ndec    : array.  Number of places to round title values.
 
     Outputs
     -------
@@ -77,11 +87,11 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
     # 1-2-3sigma plots
     if kll is not None:
         ax.fill_between(xvals, lo3, hi3, facecolor="#d9ecff", 
-                        edgecolor="#d9ecff", label="3$\sigma$")
+                        edgecolor="#d9ecff", label="$99.73\%$ region")
         ax.fill_between(xvals, lo2, hi2, facecolor="#C0DFFF", 
-                        edgecolor="#C0DFFF", label="2$\sigma$")
+                        edgecolor="#C0DFFF", label="$95.45\%$ region")
         ax.fill_between(xvals, lo1, hi1, facecolor="cornflowerblue", 
-                        edgecolor="cornflowerblue", label="1$\sigma$")
+                        edgecolor="cornflowerblue", label="$68.27\%$ region")
         ymin = np.amin([ymin, lo3.min()-0.01*lo3.min()])
         ymax = np.amax([ymax, hi3.max()+0.01*hi3.min()])
     # Best fit plot
@@ -95,10 +105,28 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.ylim(ymin, ymax)
     plt.xlim(*xlims)
-    ax.set_ylabel(r""+ylabel)
+    ax.set_ylabel(r""+ylabel, fontsize=12)
     ax.set_xscale('log')
     for label in ax.xaxis.get_ticklabels(which='both'):
         label.set_visible(False)
+    # Title
+    if title and bestpars is not None:
+        if ndec is not None:
+            truernd = np.array([np.around(truepars[i], ndec[i]) 
+                                for i in range(len(truepars))])
+            bestrnd = np.array([np.around(bestpars[i], ndec[i]) 
+                                for i in range(len(bestpars))])
+        else:
+            truernd = truepars.copy()
+            bestrnd = bestpars.copy()
+        if type(title) == str:
+            titlestr = title + '\n'
+        else:
+            titlestr = ''
+        if truepars is not None:
+            titlestr = titlestr + 'True parameters: ' + ', '.join(list(truernd.astype(str))) + '\n'
+        titlestr = titlestr + 'Best-fit parameters: ' + ', '.join(list(bestrnd.astype(str)))
+        plt.title(titlestr, fontsize=10)
     # Residuals
     ax2 = fig1.add_axes((.1, .1, .8, .2))
     resid  = data - bestfit
@@ -108,12 +136,12 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
     #yticks[-1].label.set_visible(False)
     ax2.set_ylabel('Residuals', fontsize=12)
     ylims = plt.ylim()
-    ax2.set_xlabel(r""+xlabel)
+    ax2.set_xlabel(r""+xlabel, fontsize=12)
     ax2.set_xscale('log')
-    formatter = tck.FuncFormatter(lambda y, _: '{:.8g}'.format(y))
+    formatter = tck.FuncFormatter(lambda y, _: '{:g}'.format(y))
     ax2.get_xaxis().set_major_formatter(formatter)
     ax2.get_xaxis().set_minor_formatter(formatter)
-    # hide odd xaxis labels
+    # Prevent overlapping xaxis tick labels
     fig1.canvas.draw()
     lbls = []
     for label in ax2.xaxis.get_ticklabels(minor=True):
