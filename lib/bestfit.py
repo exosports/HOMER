@@ -112,18 +112,20 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
     # Title
     if title and bestpars is not None:
         if ndec is not None:
-            truernd = np.array([np.around(truepars[i], ndec[i]) 
-                                for i in range(len(truepars))])
             bestrnd = np.array([np.around(bestpars[i], ndec[i]) 
                                 for i in range(len(bestpars))])
         else:
-            truernd = truepars.copy()
             bestrnd = bestpars.copy()
         if type(title) == str:
             titlestr = title + '\n'
         else:
             titlestr = ''
         if truepars is not None:
+            if ndec is not None:
+                truernd = np.array([np.around(truepars[i], ndec[i]) 
+                                    for i in range(len(truepars))])
+            else:
+                truernd = truepars.copy()
             titlestr = titlestr + 'True parameters: ' + ', '.join(list(truernd.astype(str))) + '\n'
         titlestr = titlestr + 'Best-fit parameters: ' + ', '.join(list(bestrnd.astype(str)))
         plt.title(titlestr, fontsize=10)
