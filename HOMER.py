@@ -77,6 +77,15 @@ def HOMER(cfile):
             scale      = conf.getboolean("scale")
             plot_PT    = conf.getboolean("plot_PT")
             quantiles  = conf.getboolean("quantiles")
+            try:
+                title  = conf.getboolean("title")
+            except:
+                title  = False
+            if title:
+                try:
+                    ndec = [int(val) for val in conf["ndec"].split()]
+                except:
+                    ndec = None
 
             # Directories
             inputdir  = os.path.join(os.path.abspath(conf["inputdir" ]), '')
@@ -502,7 +511,8 @@ def HOMER(cfile):
             # Plot best-fit model
             print("\nPlotting best-fit model...\n")
             BF.plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, 
-                            bestfit, xlabel, ylabel, kll, wn)
+                            bestfit, xlabel, ylabel, kll, wn, 
+                            bestp, truepars, title, ndec)
 
             # Shift posterior params, if needed (e.g., for units)
             if postshift is not None:
@@ -535,10 +545,11 @@ def HOMER(cfile):
                       truepars=truepars)
             mcp.histogram(outp, parname=pnames[pstep>0], thinning=thinning, 
                           savefile=outputdir+savefile+"LISA_posterior.png", 
-                          truepars=truepars, credreg=True)
+                          truepars=truepars, credreg=True, ptitle=title)
             mcp.pairwise(outp, parname=pnames[pstep>0], thinning=thinning, 
                          savefile=outputdir+savefile+"LISA_pairwise.png", 
-                         truepars=truepars, credreg=True)
+                         truepars=truepars, credreg=True, ptitle=title, 
+                         ndec=ndec)
 
             # PT profiles
             if plot_PT:
