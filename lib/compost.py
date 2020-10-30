@@ -16,7 +16,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-import mcmcplots as P
+import plotter as P
 
 
 def comp_histogram(stack1, stack2, name1, name2, 

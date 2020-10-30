@@ -1,10 +1,15 @@
 #! /usr/bin/env python
-
+"""
+Script to produce a lower-resolution grid from high-res NN output.
+"""
 import sys, os
 import numpy as np
 
+# Target number of bins
 nbins = 46
+# Full-resolution grid of NN output
 xvals = np.load('xvals.npy')
+# Compute the value of each bin, as well as the left- and right-most values
 xvals_bin = 0
 for i in range(nbins):
     xvals_bin += xvals[i::nbins]
@@ -13,8 +18,9 @@ for i in range(nbins):
     elif i==nbins-1:
         rght = xvals[i::nbins]
 
+# Save the binned values
 xvals_bin /= nbins
-np.save('xvals_binned.npy', xvals_bin)
+np.save('xvals_binned'+str(nbins)+'.npy', xvals_bin)
 
 # Create the filters
 for i in range(len(left)):

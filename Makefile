@@ -1,6 +1,6 @@
-all: mccubed datasketches
+all: lisa datasketches
 
-mccubed:
+lisa:
 	@cd ./modules/LISA/modules/MCcubed && make
 	@echo "Finished compiling MCcubed.\n"
 

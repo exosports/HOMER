@@ -23,7 +23,7 @@ import NN
 import bestfit   as BF
 import compost   as C
 import utils     as U
-import mcmcplots as P
+import plotter   as P
 
 moddir = os.path.dirname(__file__) + '/modules'
 lisadir = moddir + '/LISA/'
@@ -81,11 +81,10 @@ def HOMER(cfile):
                 title  = conf.getboolean("title")
             except:
                 title  = False
-            if title:
-                try:
-                    ndec = [int(val) for val in conf["ndec"].split()]
-                except:
-                    ndec = None
+            if "ndec" in conf.keys():
+                ndec = [int(val) for val in conf["ndec"].split()]
+            else:
+                ndec = None
 
             # Directories
             inputdir  = os.path.join(os.path.abspath(conf["inputdir" ]), '')
@@ -110,13 +109,16 @@ def HOMER(cfile):
             else:
                 uncert = np.array([float(num)                        \
                                    for num in conf["uncert"].split()])
-            if conf["filters"] != 'None':
-                filters = conf["filters"].split()
-                filt2um = float(conf["filt2um"])
-            else:
-                filters = None
-                filt2um = 1
 
+            if "filters" not in conf.keys():
+                filters = None
+                filtconv = 1
+            elif conf["filters"] == 'None':
+                filters = None
+                filtconv = 1
+            else:
+                filters = conf["filters"].split()
+                filtconv = float(conf["filtconv"])
 
             if conf["starspec"] != 'None':
                 if not os.path.isabs(conf["starspec"]):
@@ -210,8 +212,14 @@ def HOMER(cfile):
                 xvals = np.load(conf["xvals"])
             else:
                 xvals = np.load(inputdir + conf["xvals"])
-            wn     = conf.getboolean("wn")
-            wnfact = float(conf["wnfact"])
+            if "wn" in conf.keys():
+                wn = conf.getboolean("wn")
+            else:
+                wn = True
+            if "wnfact" in conf.keys():
+                wnfact = float(conf["wnfact"])
+            else:
+                wnfact = 1.
             xlabel = conf["xlabel"]
             ylabel = conf["ylabel"]
             fmean  = conf["fmean"]
@@ -238,9 +246,12 @@ def HOMER(cfile):
                 except:
                     raise ValueError("Invalid specification for postshift.")
 
-            savefile = conf['savefile']
-            if savefile != '':
-                savefile = savefile + '_'
+            if "savefile" in conf.keys():
+                savefile = conf['savefile']
+                if savefile != '':
+                    savefile = savefile + '_'
+            else:
+                savefile = ''
 
             # MCMC params
             if conf['flog'] != '' and conf['flog'] != 'None':
@@ -254,14 +265,24 @@ def HOMER(cfile):
             f = conf["func"].split()
             if len(f) == 3:
                 sys.path.append(f[2])
-            func     = importlib.import_module(f[1]).__getattribute__(f[0])
-            pinit    = np.array([float(val) for val in conf["pinit"].split()])
-            pmin     = np.array([float(val) for val in conf["pmin" ].split()])
-            pmax     = np.array([float(val) for val in conf["pmax" ].split()])
-            pstep    = np.array([float(val) for val in conf["pstep"].split()])
-            niter    = int(conf.getfloat("niter"))
-            burnin   = conf.getint("burnin")
-            nchains  = conf.getint("nchains")
+            elif len(f) > 3:
+                raise ValueError("The 'func' parameter can have 3 elements "   \
+                               + "at most. Given "+str(len(f))+" elements:\n" \
+                               + str(f))
+            func  = importlib.import_module(f[1]).__getattribute__(f[0])
+            pinit = np.array([float(val) for val in conf["pinit"].split()])
+            pmin  = np.array([float(val) for val in conf["pmin" ].split()])
+            pmax  = np.array([float(val) for val in conf["pmax" ].split()])
+            pstep = np.array([float(val) for val in conf["pstep"].split()])
+            niter = int(conf.getfloat("niter"))
+            if "burnin" in conf.keys():
+                burnin = conf.getint("burnin")
+            else:
+                burnin = 0
+            if "nchains" in conf.keys():
+                nchains = conf.getint("nchains")
+            else:
+                nchains = 1
             thinning = conf.getint("thinning")
             try:
                 perc = np.array([float(val) for val in conf["perc"].split()])
@@ -269,17 +290,20 @@ def HOMER(cfile):
                 perc = np.array([0.6827, 0.9545, 0.9973])
 
             # Get the true parameters, if given
-            truepars = conf["truepars"]
-            if conf["truepars"] in ["", "None", "none", "False", "false"]:
+            if "truepars" not in conf.keys():
+                truepars = None
+            elif conf["truepars"] in ["", "None", "none", "False", "false"]:
                 truepars = None
             else:
                 if '.npy' in conf["truepars"]:
                     truepars = np.load(conf["truepars"])
-                    if len(truepars) > inD:
-                        truepars = truepars[:inD]
                 else:
                     truepars = np.array([float(val) 
                                          for val in conf["truepars"].split()])
+                if len(truepars) != inD:
+                    raise ValueError("Number of true parameter values "    + \
+                                     "given does not match the number of " + \
+                                     "inputs.")
                 if ilog:
                     truepars[ilog] = np.log10(truepars[ilog])
                 truepars = truepars[pstep>0]
@@ -371,13 +395,18 @@ def HOMER(cfile):
                 if wn:
                     xwn = xvals
                 else:
-                    xwn = 10000. / (filt2um * xvals)[::-1]
+                    xwn = wnfact / (filtconv * xvals)[::-1]
                 for i in range(len(filters)):
                     datfilt = np.loadtxt(filters[i])
-                    # Convert filter wavelenths to microns, then convert um -> cm-1
-                    finterp = si.interp1d(10000. / (filt2um * datfilt[:,0]), 
-                                          datfilt[:,1],
-                                          bounds_error=False, fill_value=0)
+                    if wn:
+                        finterp = si.interp1d(datfilt[:,0], 
+                                              datfilt[:,1],
+                                              bounds_error=False, fill_value=0)
+                    else:
+                        # Convert filter x-values, then convert to inverse space
+                        finterp = si.interp1d(wnfact / (filtconv * datfilt[:,0]), 
+                                              datfilt[:,1],
+                                              bounds_error=False, fill_value=0)
                     # Interpolate and normalize
                     tranfilt = finterp(xwn)
                     tranfilt = tranfilt / np.trapz(tranfilt, xwn)
@@ -429,7 +458,7 @@ def HOMER(cfile):
                 indparams = [nn, 
                              x_mean, x_std, y_mean, y_std, 
                              x_min, x_max, y_min, y_max, scalelims, 
-                             xvals*wnfact, starspec, factor, 
+                             xvals, starspec, factor, 
                              filttran, ifilt, ilog, olog, 
                              kll, count, burnin]
                 params = {"data"      : data     , "uncert"     : uncert, 
@@ -444,6 +473,7 @@ def HOMER(cfile):
                           "flog"      : flog}
 
             elif alg in ['multinest', 'ultranest']:
+                burnin  = 0
                 nchains = 1
                 # Set static variables for `func`
                 model = functools.partial(func, nn=nn, inD=inD, 
@@ -555,7 +585,7 @@ def HOMER(cfile):
             if plot_PT:
                 print("Plotting PT profiles...\n")
                 pressure = np.loadtxt(inputdir + fpress, skiprows=1)[:,1]
-                P.mcmc_pt(outp[:5], pressure, PTargs, 
+                P.pt_post(outp[:5], pressure, PTargs, 
                           savefile=outputdir+savefile+"LISA_PT.png")
 
             # Format parameter names, and find maximum length

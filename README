@@ -23,10 +23,15 @@ that was used throughout development of the software.
 
 Summary
 =======
-HOMER is an MCMC-based inverse modeling code.  Given some data and 
+HOMER is a Bayesian inverse modeling code.  Given some data and 
 uncertainties, the posterior distribution is determined for some model. 
 
-At present, HOMER uses MCcubed for its MCMC.  HOMER's forward model is a neural 
+HOMER uses the Large-selection Interface for Sampling Algorithms (LISA) for 
+its Bayesian framework.  LISA allows for both MCMC and nested sampling 
+algorithms.  For details, see the LISA User Manual at 
+https://exosports.github.io/LISA/doc/LISA_User_Manual.html.
+
+HOMER's forward model is a neural 
 network (NN) surrogate model trained by MARGE.  For details on MARGE, see the 
 MARGE User Manual at 
 https://exosports.github.io/MARGE/doc/MARGE_User_Manual.html.
@@ -42,7 +47,7 @@ must be updated in associated documentation.
 
 HOMER is released under a Reproducible Research License.  Users are free to 
 use the software for personal reasons.  Users publishing results from HOMER 
-or modified versions of it in a peer-reviewed journal are required to publicly 
+(or modified versions of it) in a peer-reviewed journal are required to publicly
 release all necessary code/data to reproduce the published work.  Modified 
 versions of HOMER are required to also be released open source under the same 
 Reproducible Research License.  For more details, see the text of the license.
@@ -57,18 +62,20 @@ doc/            - Contains documentation for HOMER.  The User Manual contains
                   walkthrough for setup and running an example.
 environment.yml - Contains all required packages (w/ versions) for HOMER.
 example/        - Contains example of executing HOMER.
+                  Includes example functions for each sampling algorithm.
+                  See README within the directory for more details.
 HOMER.py        - The executable driver for HOMER. Accepts a configuration file.
 lib/            - Contains the classes and functions of HOMER.
   bestfit.py    - Contains functions to plot the best-fit spectrum.
   compost.py    - Contains functions to compare posterior distributions.
-  func.py       - Contains functions to be evaluated by the MCMC.
-  mcmcplots.py  - Contains functions to plot results of the MCMC.
+  func.py       - Contains example functions to be evaluated by an MCMC sampler.
   NN.py         - Contains a function to load a MARGE NN model.
+  plotter.py    - Contains functions to plot results of the inference.
   utils.py      - Contains utiity functions.
 Makefile        - Handles setting up BART, and creating a TLI file.
 modules/        - Contains submodules for data generation, quantile calculation.
   datasketches  - Streaming quantiles package.
-  MCcubed       - MCMC package.
+  LISA          - Bayesian sampler package.
 README          - This file!
 
 
@@ -78,10 +85,9 @@ for more details.
 
 Installation
 ============
-After recursively cloning the repo, users must compile MCcubed. 
-Do so by entering
-    make mccubed
-into the terminal.
+After recursively cloning the repo, users must compile one of LISA's modules. 
+From HOMER's directory,
+    make lisa
 
 If the user wishes to compute median and 1-2-3sigma spectra, they will require 
 the datasketches package.  From the HOMER directory, enter
@@ -117,25 +123,31 @@ outputdir : str.  Directory containing HOMER outputs.
 
 Run Parameters
 --------------
-quantiles   : bool. Determines whether to compute spectra quantiles.
-                    If the Datasketches library is not install, this setting 
+quantiles   : bool. Determines whether to compute quantiles.
+                    If the Datasketches library is not installed, this setting 
                     has no effect.
-onlyplot    : bool. Determines whether to skip the MCMC.
+onlyplot    : bool. Determines whether to skip the inference.
                     Reproduces plots \& calculations related to posterior.
 plot_PT     : bool. Determines whether to compute the explored 
                     pressure--temperature profiles using the formulation of 
-                    Line et al. (2013)
+                    Line et al. (2013).  Presently, this requires the model 
+                    parameters to be ordered as 
+                    log(kappa), log(gamma1), log(gamma2), alpha, beta, 
+                    followed by any other parameters.
 credregion  : bool. Determines whether to calculate the 68, 95, and 99\% 
                     credible regions \& uncertainties.
 compost     : bool. Determines whether to compare HOMER's posterior to 
                     another.
-compfile    : str.  Path to posterior to compare with HOMER.
+compfile    : str.  Path to posterior .npy file to compare with HOMER.
 compname    : str.  Name of the other posterior for plot legends.
 compsave    : str.  File name prefix for the saved comparison plots.
 compshift   : floats. Shifts all values of a particular parameter by a 
                     set amount in the posterior to be compared, such as 
-                    for unit conversions.
+                    for factor-of-10 unit conversions in a log space.
                     Format: val1 val2 val3 val4 ...
+                    E.g., compshift = 1 0 0 would increase all of the first 
+                    parameter's values by 1 and leave the other parameters 
+                    alone.
 postshift   : floats. Same as `compshift`, but for HOMER's posterior.
 
 
@@ -177,13 +189,19 @@ inD  : int. Dimensionality of the input  to the NN.
 outD : int. Dimensionality of the output of the NN.
 
 
-MCMC Parameters
----------------
-flog        : str.  Path to MCMC log file. 
-                    If relative, with respect to input dir.
+Bayesian Sampler Parameters
+---------------------------
+alg         : str.  Bayesian sampling algorithm.  Options:
+                      demc                 ter Braak (2006)
+                      snooker      ter Braak & Vrugt (2008)
+                      multinest         Feroz et al. (2008)
+                      ultranest              Buchner (2014, 2016, 2019)
 func        : strs. Function and file to evaluate at each iteration of 
                     the MCMC.
-                    Format: function file
+                    Format: 
+                      function file
+                    or, if the file is in a different directory,
+                      function file path/to/file/
                     Note: omit the '.py' from `file`.
 pnames      : strs. Name of each free parameter. Can include LaTeX 
                     formatting.
@@ -193,30 +211,54 @@ pmax        : floats. Maxima for free parameters.
 pstep       : floats. Step size for free parameters. 
                       This will change throughout the MCMC due to the 
                       differential evolution algorithm used.
-niter       : int.  Number of total iterations.
-burnin      : int.  Number of burned iterations from the beginning of 
-                    chains.
-nchains     : int.  Number of parallel samplers.
-thinning    : int.  Thinning factor for posterior.
 data        : floats. Values to be fit via MCMC. 
                     Format: Separate each value by an indented newline.
                     Alternatively, specify a .NPY file.
 uncert      : floats. Uncertainties on values to be fit via MCMC. 
                       Same format (indented newlines or .NPY)
-filters     : strs. Paths to filters associated with each datum. 
-                    Same format (indented newlines only)
+
+
+Additional Sampler Parameters
+-----------------------------
+Only required if your setup requires the parameter.
+
+filters     : strs. Paths to filter bandpasses associated with each datum. 
+                    Separate each by indented newlines.
+                    X-axis values must have the same type of units as `xvals`,
+                    but may be separated by a constant multiplicative factor
+                    (e.g., mm vs um, ft vs inch), see `filtconv` argument.
 starspec    : str.  Path to .NPY file of the stellar spectrum.
-factor      : str.  Path to .NPY file of multiplication factor by which 
+                    More generally, this is an array of scaling factors that 
+                    can be used when calculating the model.
+factor      : str.  Path to .NPY file of scaling factor by which 
                     to modify de-normalized predictions. 
                     E.g., unit conversion.
-wnfact      : float. Multiplication factor to convert `xvals` to cm-1.
-filt2um     : float. Multiplication factor to convert the filter 
-                     wavelengths to microns.
-PTargs      : str.  Path to .txt file containing values necessary to 
-                    calculate the temperature--pressure profile.
-                    Currently, only option is Line et al. (2013) method.
-                    Format: R_star (m), T_star (K), T_int (K), 
-                            sma (m), grav (cm s-2)
+wn          : bool. In astro context, determines whether the X-axis units are 
+                    spatial frequency (True) or wavelength (False).
+                    More generally, when wn = False, the X-axis values are 
+                    transformed to their inverse when plotting and 
+                    band-integrating models.  
+wnfact      : float. Multiplication factor when computing the inverse of 
+                     `xvals`.
+                     E.g., if `xvals` is in cm-1 and the desired inverse units 
+                     are um, then wnfact = 1e4.
+filtconv    : float. Multiplication factor to convert the filter 
+                     X-value units to the `xvals` units.
+                     E.g., if filter X values are in nm, but `xvals` are in um, 
+                     this argument would be set to 1e-3.
+
+
+MCMC Parameters
+---------------
+Not required for nested sampling algorithms.
+
+flog        : str.  Path to MCMC log file. 
+                    If relative, with respect to input dir.
+nchains     : int.  Number of parallel samplers.
+niter       : int.  Number of total iterations.
+burnin      : int.  Number of burned iterations from the beginning of 
+                    chains.
+thinning    : int.  Thinning factor for posterior.
 
 
 Plotting Parameters
@@ -229,6 +271,12 @@ ylabel     : str.  Y-axis label for plots.
 fpress     : str.  Path to text file containing the pressures of each 
                    layer of the atmosphere, for plotting T(p) profiles.
                    If relative, with respect to `inputdir`.
+PTargs     : str.  Path to .txt file containing values necessary to 
+                   calculate the temperature--pressure profile.
+                   Currently, only option is Line et al. (2013) method.
+                   Format: R_star (m), T_star (K), T_int (K), 
+                           sma (m), grav (cm s-2)
+                   If plot_PT is False, this argument does nothing.
 savefile   : str.  (optional) Prefix for MCMC plots to be saved.
 
 
@@ -249,6 +297,10 @@ versions of packages:
  - ONNX 1.6.0
  - keras2onnx 1.6.1
  - onnx2keras 0.0.18
+ - pymultinest 2.10
+ - ultranest 2.2.2
+
+See the supplied environment.yml file.
 
 
 Be kind

@@ -1,7 +1,7 @@
 """
 Makes plots based on the MCMC posterior.  Adapted from BART.
 
-mcmc_pt: Plots the temperature--pressure profiles explored by the MCMC.
+pt_post: Plots the temperature--pressure profiles explored by the sampler.
 
 PT_line: computes the temperature--pressure profile according to 
          Line et al. (2013)
@@ -16,10 +16,10 @@ import matplotlib.pyplot as plt
 import scipy.special as sp
 
 
-__all__ = ["mcmc_pt", "PT_line", "xi"]
+__all__ = ["pt_post", "PT_line", "xi"]
 
 
-def mcmc_pt(outp, pressure, PTargs, 
+def pt_post(outp, pressure, PTargs, 
             savefile=None):
     """
     Computes the median, 1sigma from median, and 2sigma from median PT profiles.
