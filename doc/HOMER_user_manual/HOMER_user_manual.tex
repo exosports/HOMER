@@ -294,6 +294,7 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
 \end{itemize}
 
 \noindent \underline{Bayesian Sampler Parameters}
+\begin{itemize}
 \item alg   : str.  Bayesian sampling algorithm.  Options:
                       demc                 ter Braak (2006)
                       snooker      ter Braak & Vrugt (2008)
@@ -319,11 +320,13 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
                     Alternatively, specify a .NPY file.
 \item uncert: floats. Uncertainties on values to be fit via MCMC. 
                       Same format (indented newlines or .NPY)
+\end{itemize}
 
 
 \noindent \underline{Additional Sampler Parameters}
 Only required if your setup requires the parameter.
 
+\begin{itemize}
 \item filters     : strs. Paths to filter bandpasses associated with each datum. 
                     Separate each by indented newlines.
                     X-axis values must have the same type of units as `xvals`,
@@ -348,6 +351,7 @@ Only required if your setup requires the parameter.
                      X-value units to the `xvals` units.
                      E.g., if filter X values are in nm, but `xvals` are in um, 
                      this argument would be set to 1e-3.
+\end{itemize}
 
 
 \noindent \underline{MCMC Parameters}
