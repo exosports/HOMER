@@ -238,19 +238,6 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
                     followed by any other parameters.
 \item credregion  : bool. Determines whether to calculate the 68, 95, and 99\% 
                     credible regions \& uncertainties.
-\item compost     : bool. Determines whether to compare HOMER's posterior to 
-                          another.
-\item compfile    : str.  Path to posterior .NPY file to compare with HOMER.
-\item compname    : str.  Name of the other posterior for plot legends.
-\item compsave    : str.  File name prefix for the saved comparison plots.
-\item compshift   : floats. Shifts all values of a particular parameter by a 
-                          set amount in the posterior to be compared, such as 
-                          for factor-of-10 unit conversions in a log space.
-                    E.g., compshift = 1 0 0 would increase all of the first 
-                    parameter's values by 1 and leave the other parameters 
-                    alone.
-                    Format: val1 val2 val3 val4 ...
-\item postshift   : floats. Same as `compshift`, but for HOMER's posterior.
 \end{itemize}
 
 
@@ -296,10 +283,10 @@ HOMER run. The arguments follow the format {\ttb argument = value}, where
 \noindent \underline{Bayesian Sampler Parameters}
 \begin{itemize}
 \item alg   : str.  Bayesian sampling algorithm.  Options:
-                      demc                 ter Braak (2006)
-                      snooker     ter Braak \& Vrugt (2008)
-                      multinest         Feroz et al. (2008)
-                      ultranest              Buchner (2014, 2016, 2019)
+                      demc                 (ter Braak 2006)
+                      snooker     (ter Braak \& Vrugt 2008)
+                      multinest         (Feroz et al. 2008)
+                      ultranest              (Buchner 2014, 2016, 2019)
 \item func  : strs. Function and file to evaluate at each iteration of 
                     the MCMC.
                     Format: 
@@ -362,7 +349,7 @@ Only required if your setup requires the parameter.
 \item niter       : int.  Number of total iterations.
 \item burnin      : int.  Number of burned iterations from the beginning of 
                           chains.
-\item thinning    : int.  Thinning factor for posterior.
+\item thinning    : int.  Thinning factor for the posterior (keep every N iterations). Example: a thinning factor of 3 will keep every third iteration.  Only recommended when the computed posterior is extremely large; not recommended for any nested sampling algorithms.  Default: 1
 \end{itemize}
 
 \noindent \underline{Plotting Parameters}
@@ -375,15 +362,42 @@ Only required if your setup requires the parameter.
 \item fpress     : str.  Path to text file containing the pressures of each 
                          layer of the atmosphere, for plotting T(p) profiles.
                          If relative, with respect to `inputdir`.
+                         If plot\_PT is False, this argument does nothing.
 \item PTargs     : str.  Path to .txt file containing values necessary to 
                    calculate the temperature--pressure profile.
                    Currently, only option is Line et al. (2013) method.
                    Format: R\_star (m), T\_star (K), T\_int (K), 
                            sma (m), grav (cm s-2)
                    If plot\_PT is False, this argument does nothing.
+\item truepars   : floats.  The true values of the model parameters to be 
+                         retrieved.  If unknown (e.g., real observational data),
+                         omit this key, or set it to None or False.
+                         Format: values separated by spaces or newlines, or 
+                                 a .NPY file containing the values.
+\item postshift   : floats. Shifts all values of a particular parameter by a 
+                          set amount in the posterior to be compared, such as 
+                          for factor-of-10 unit conversions in a log space.
+                    E.g., postshift = 1 0 0 would increase all of the first 
+                    parameter's values by 1 and leave the other parameters 
+                    alone.
+                    Format: val1 val2 val3 val4 ...
 \item savefile   : str.  (optional) Prefix for MCMC plots to be saved.
 \end{itemize}
 
+\noindent \underline{Comparing Posteriors (optional)}
+\begin{itemize}
+\item compost     : bool. Determines whether to compare HOMER's posterior to 
+                          another.
+\item compfile    : str.  Path to posterior .NPY file to compare with HOMER.
+\item compname    : str.  Name of the other posterior for plot legends.
+\item compsave    : str.  File name prefix for the saved comparison plots.
+\item compshift   : floats. Same as `postshift`, but for the posterior being 
+                          compared.
+\item cinit       : floats. Same as `pinit`, but for the posterior being 
+                          compared.
+                          Only required if `plot\_PT` is True and one or more 
+                          of the T(p) parameters are held fixed.
+\end{itemize}
 
 
 \section{Program Outputs}

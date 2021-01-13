@@ -17,7 +17,7 @@ import numpy as np
 import utils as U
 
 
-def eval(params, model, 
+def eval(params, nn, 
          x_mean, x_std, y_mean, y_std, 
          x_min,  x_max, y_min,  y_max, scalelims, 
          wavenum=None, 
@@ -32,7 +32,7 @@ def eval(params, model,
     Inputs
     ------
     params   : array. Parameters to be predicted on.
-    model    : object. Trained NN model.
+    nn       : object. Trained NN model.
     x_mean   : array. Mean of inputs.
     x_std    : array. Standard deviation of inputs.
     y_mean   : array. Mean of outputs.
@@ -42,12 +42,12 @@ def eval(params, model,
     y_min    : array. Minima of outputs.
     y_max    : array. Maxima of outputs.
     scalelims: list.  [Lower, upper] bounds for scaling.
-    wavenum  : array. (filler) Wavenumbers (cm-1) associated with the NN output.
-    starspec : array. (optional) Stellar spectrum at `wavenum`.
+    xvals    : array. (filler) X-axis values associated with the NN output.
+    starspec : array. (optional) Stellar spectrum at `xvals`.
     factor   : float. (optional) Multiplication factor to convert the 
                       de-normalized NN output.
     filters  : list, arrays. (filler) Transmission of filters.
-    ifilt    : array. (filler) `wavenum` indices where the filters are nonzero.
+    ifilt    : array. (filler) `xvals` indices where the filters are nonzero.
     ilog     : bool. True if the NN input  is the log10 of the inputs.
     olog     : bool. True if the NN output is the log10 of the outputs.
     kll      : object. (optional) Streaming quantiles calculator.
@@ -74,7 +74,7 @@ def eval(params, model,
                    x_min, x_max, scalelims)
 
     # Predict
-    pred = model.predict(pars)
+    pred = nn.predict(pars)
 
     # Post-process
     # Descale & denormalize
@@ -101,10 +101,10 @@ def eval(params, model,
     return pred
 
 
-def eval_binned(params, model, 
+def eval_binned(params, nn, 
                 x_mean, x_std, y_mean, y_std, 
                 x_min,  x_max, y_min,  y_max, scalelims, 
-                wavenum, 
+                xvals, 
                 starspec=None, factor=None, 
                 filters=None, ifilt=None, 
                 ilog=False, olog=False, 
@@ -116,7 +116,7 @@ def eval_binned(params, model,
     Inputs
     ------
     params   : array. Parameters to be predicted on.
-    model    : object. Trained NN model.
+    nn       : object. Trained NN model.
     x_mean   : array. Mean of inputs.
     x_std    : array. Standard deviation of inputs.
     y_mean   : array. Mean of outputs.
@@ -126,12 +126,12 @@ def eval_binned(params, model,
     y_min    : array. Minima of outputs.
     y_max    : array. Maxima of outputs.
     scalelims: list.  [Lower, upper] bounds for scaling.
-    wavenum  : array. Wavenumbers (cm-1) associated with the NN output.
-    starspec : array. (optional) Stellar spectrum at `wavenum`.
+    xvals    : array. X-axis values associated with the NN output.
+    starspec : array. (optional) Stellar spectrum at `xvals`.
     factor   : float. (optional) Multiplication factor to convert the 
                       de-normalized NN output.
     filters  : list, arrays. Transmission of filters.
-    ifilt    : array. `wavenum` indices where the filters are nonzero.
+    ifilt    : array. `xvals` indices where the filters are nonzero.
     ilog     : bool. True if the NN input  is the log10 of the inputs.
     olog     : bool. True if the NN output is the log10 of the outputs.
     kll      : object. (optional) Streaming quantiles calculator.
@@ -158,7 +158,7 @@ def eval_binned(params, model,
                    x_min, x_max, scalelims)
 
     # Predict
-    pred = model.predict(pars)
+    pred = nn.predict(pars)
 
     # Post-process
     # Descale & denormalize
@@ -186,7 +186,7 @@ def eval_binned(params, model,
     nfilters = len(filters)
     results  = np.zeros((pars.shape[0], nfilters))
     for i in range(nfilters):
-        results[:, i] = np.trapz(pred[:,ifilt[i,0]:ifilt[i,1]] * filters[i], wavenum[ifilt[i,0]:ifilt[i,1]], axis=-1)
+        results[:, i] = np.trapz(pred[:,ifilt[i,0]:ifilt[i,1]] * filters[i], xvals[ifilt[i,0]:ifilt[i,1]], axis=-1)
 
     return results
 

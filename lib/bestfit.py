@@ -11,8 +11,9 @@ plt.ion()
 
 
 def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit, 
-                 xlabel, ylabel, kll=None, wn=True, 
-                 bestpars=None, truepars=None, title=False, ndec=None):
+                 xlabel, ylabel, kll=None, 
+                 bestpars=None, truepars=None, title=False, ndec=None, 
+                 fext='.png'):
     """
     Plots the best-fit model.
 
@@ -32,7 +33,6 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
     xlabel  : string. X-axis label.
     ylabel  : string. Y-axis label.
     kll     : object. Streaming quantiles calculator, for 1-2-3 sigma spectra.
-    wn      : bool.   Determines if `xvals` is in wavenumber or wavelength.
     bestpars: array.  If None, will not be used.  Otherwise, array of best-fit 
                       parameter values.  If title is True, they will be 
                       included in the title.
@@ -42,6 +42,7 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
     title   : bool.   If False, does not plot title. 
                       If True, plots the best-fit parameters as the title.
     ndec    : array.  Number of places to round title values.
+    fext    : str.    File extension for the saved plot.
 
     Outputs
     -------
@@ -57,9 +58,6 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
         lo3    = kll.get_quantiles(0.0014)[:, 0]
         hi3    = kll.get_quantiles(0.9986)[:, 0]
 
-    # Convert wavenumber --> microns
-    if wn:
-        xvals  = 1e4/xvals
     # Set up the x-axis error array
     if ifilt is None:
         xerr = np.zeros((2, len(xvals)))
@@ -69,13 +67,12 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
         xerr[1,-1   ] = xerr[0,-1]
         xax           = xvals
     else:
-        if wn:
-            meanwave = 1e4/meanwave
-            ifilt = ifilt[:,::-1]
         xerr = np.abs(xvals[ifilt].T - meanwave)
         xax  = meanwave
+    if xvals[1] < xvals[0]:
+        xerr = xerr[::-1]
 
-    xlims = np.amin(meanwave)-pad*xerr[0,0], np.amax(meanwave)+pad*xerr[-1,-1]
+    xlims = meanwave[0]-pad*xerr[0,0], meanwave[-1]+pad*xerr[-1,-1]
 
     # Plot
     fig1 = plt.figure(42, dpi=600)
@@ -102,7 +99,7 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
                 ecolor='tab:red', label="Data", zorder=80)
     ymin = np.amin([ymin, data.min()-pad*uncert.max(), bestfit.min()-pad*uncert.max()])
     ymax = np.amax([ymax, data.max()+pad*uncert.max(), bestfit.max()+pad*uncert.max()])
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=3)
     plt.ylim(ymin, ymax)
     plt.xlim(*xlims)
     ax.set_ylabel(r""+ylabel, fontsize=12)
@@ -171,7 +168,7 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
     plt.yticks(visible=False)
     plt.setp(ax3.get_xticklabels()[0], visible=False)
     '''
-    plt.savefig(outputdir+'bestfit_spectrum.png', bbox_inches='tight')
+    plt.savefig(outputdir+'bestfit_spectrum'+fext, bbox_inches='tight')
     plt.close()
 
 

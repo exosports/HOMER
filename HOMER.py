@@ -46,6 +46,11 @@ except:
           'not calculate spectra quantiles.')
 
 
+# Global variable for plotting T(p) posteriors, 
+# since only Line et al. (2013) is supported currently
+nPT = 5
+
+
 def HOMER(cfile):
     """
     Main driver for the software.
@@ -76,6 +81,10 @@ def HOMER(cfile):
             normalize  = conf.getboolean("normalize")
             scale      = conf.getboolean("scale")
             plot_PT    = conf.getboolean("plot_PT")
+            if "fext" in conf.keys():
+                fext   = conf["fext"]
+            else:
+                fext   = ".png"
             quantiles  = conf.getboolean("quantiles")
             try:
                 title  = conf.getboolean("title")
@@ -235,7 +244,9 @@ def HOMER(cfile):
             else:
                 pnames = conf['pnames'].split()
 
-            if conf['postshift'] in ['', 'None', 'none', 'False', 'false', 'F']:
+            if 'postshift' not in conf.keys():
+                postshift = None
+            elif conf['postshift'] in ['', 'None', 'none', 'False', 'false', 'F']:
                 postshift = None
             elif 'norm' in conf['postshift']:
                 postshift = conf['postshift']
@@ -270,20 +281,35 @@ def HOMER(cfile):
                                + "at most. Given "+str(len(f))+" elements:\n" \
                                + str(f))
             func  = importlib.import_module(f[1]).__getattribute__(f[0])
+
             pinit = np.array([float(val) for val in conf["pinit"].split()])
             pmin  = np.array([float(val) for val in conf["pmin" ].split()])
             pmax  = np.array([float(val) for val in conf["pmax" ].split()])
             pstep = np.array([float(val) for val in conf["pstep"].split()])
+
             niter = int(conf.getfloat("niter"))
+
             if "burnin" in conf.keys():
                 burnin = conf.getint("burnin")
             else:
                 burnin = 0
+
             if "nchains" in conf.keys():
                 nchains = conf.getint("nchains")
             else:
                 nchains = 1
-            thinning = conf.getint("thinning")
+
+            if "thinning" not in conf.keys():
+                thinning = 1
+            elif conf["thinning"] in ["", "None", "none", "False", "false"]:
+                thinning = 1
+            else:
+                thinning = conf.getint("thinning")
+                if thinning < 1:
+                    print("Nonphysical thinning value provided (<1). " + \
+                          "Setting to 1.")
+                    thinning = 1
+
             try:
                 perc = np.array([float(val) for val in conf["perc"].split()])
             except:
@@ -395,7 +421,7 @@ def HOMER(cfile):
                 if wn:
                     xwn = xvals
                 else:
-                    xwn = wnfact / (filtconv * xvals)[::-1]
+                    xwn = wnfact / (filtconv * xvals)
                 for i in range(len(filters)):
                     datfilt = np.loadtxt(filters[i])
                     if wn:
@@ -411,8 +437,6 @@ def HOMER(cfile):
                     tranfilt = finterp(xwn)
                     tranfilt = tranfilt / np.trapz(tranfilt, xwn)
                     meanwn.append(np.sum(xwn*tranfilt)/sum(tranfilt))
-                    if not wn:
-                        tranfilt = tranfilt[::-1]
                     # Find non-zero indices for faster integration
                     nonzero = np.where(tranfilt!=0)
                     ifilt[i, 0] = max(nonzero[0][ 0] - 1, 0)
@@ -453,12 +477,15 @@ def HOMER(cfile):
                                                 y_mean=y_mean, y_std=y_std, 
                                                 x_min=x_min, x_max=x_max, 
                                                 y_min=y_min, y_max=y_max, 
-                                                scalelims=scalelims)
+                                                scalelims=scalelims, xvals=xwn,
+                                                filters=filttran, ifilt=ifilt, 
+                                                starspec=starspec, 
+                                                factor=factor)
                 count = np.array([0]) # to determine when to update sketches
                 indparams = [nn, 
                              x_mean, x_std, y_mean, y_std, 
                              x_min, x_max, y_min, y_max, scalelims, 
-                             xvals, starspec, factor, 
+                             xwn, starspec, factor, 
                              filttran, ifilt, ilog, olog, 
                              kll, count, burnin]
                 params = {"data"      : data     , "uncert"     : uncert, 
@@ -484,9 +511,11 @@ def HOMER(cfile):
                                                 x_min=x_min, x_max=x_max, 
                                                 y_min=y_min, y_max=y_max, 
                                                 scalelims=scalelims, 
-                                                xvals=xvals, 
+                                                xvals=xwn, 
                                                 filters=filttran, 
-                                                ifilt=ifilt)
+                                                ifilt=ifilt, 
+                                                starspec=starspec, 
+                                                factor=factor)
 
                 pr = importlib.import_module(f[1]).__getattribute__('prior')
                 ll = importlib.import_module(f[1]).__getattribute__('loglikelihood')
@@ -502,7 +531,7 @@ def HOMER(cfile):
                                                 x_min=x_min, x_max=x_max, 
                                                 y_min=y_min, y_max=y_max, 
                                                 scalelims=scalelims, 
-                                                xvals=xvals, 
+                                                xvals=xwn, 
                                                 filters=filttran, 
                                                 ifilt=ifilt)
                 prior.__name__ = 'prior'
@@ -541,8 +570,10 @@ def HOMER(cfile):
             # Plot best-fit model
             print("\nPlotting best-fit model...\n")
             BF.plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, 
-                            bestfit, xlabel, ylabel, kll, wn, 
-                            bestp, truepars, title, ndec)
+                            bestfit, xlabel, ylabel, kll=kll, 
+                            bestpars=bestp, truepars=truepars, 
+                            title=title, ndec=ndec, fext=fext)
+            sys.exit()
 
             # Shift posterior params, if needed (e.g., for units)
             if postshift is not None:
@@ -571,22 +602,28 @@ def HOMER(cfile):
             pnames = np.asarray(pnames)
             mcp.trace(outp, parname=pnames[pstep>0], thinning=thinning, 
                       sep=np.size(outp[0]//nchains), 
-                      savefile=outputdir+savefile+"LISA_trace.png", 
+                      savefile=outputdir+savefile+"LISA_trace"+fext, 
                       truepars=truepars)
             mcp.histogram(outp, parname=pnames[pstep>0], thinning=thinning, 
-                          savefile=outputdir+savefile+"LISA_posterior.png", 
+                          savefile=outputdir+savefile+"LISA_posterior"+fext, 
                           truepars=truepars, credreg=True, ptitle=title)
             mcp.pairwise(outp, parname=pnames[pstep>0], thinning=thinning, 
-                         savefile=outputdir+savefile+"LISA_pairwise.png", 
+                         savefile=outputdir+savefile+"LISA_pairwise"+fext, 
                          truepars=truepars, credreg=True, ptitle=title, 
                          ndec=ndec)
 
             # PT profiles
             if plot_PT:
                 print("Plotting PT profiles...\n")
-                pressure = np.loadtxt(inputdir + fpress, skiprows=1)[:,1]
-                P.pt_post(outp[:5], pressure, PTargs, 
-                          savefile=outputdir+savefile+"LISA_PT.png")
+                pressure  = np.loadtxt(inputdir + fpress, skiprows=1)[:,1]
+                presspost = np.zeros((nPT, outp.shape[-1]))
+                ifixd = np.arange(nPT)[(pstep<=0)[:nPT]]
+                istep = np.arange(nPT)[(pstep> 0)[:nPT]]
+                #"none" expands axis, ensures it works if no params are fixed
+                presspost[ifixd] = pinit[ifixd, None]
+                presspost[istep] = outp [istep]
+                P.pt_post(presspost, pressure, PTargs, 
+                          savefile=outputdir+savefile+"LISA_PT"+fext)
 
             # Format parameter names, and find maximum length
             parname = []
@@ -604,27 +641,33 @@ def HOMER(cfile):
                 print('Making comparison plots of posteriors...\n')
                 compfile = conf["compfile"]
                 compname = conf["compname"]
+                if "compburn" not in conf.keys():
+                    compburn = 0
+                else:
+                    compburn = conf.getint("compburn")
                 if not os.path.isabs(conf["compsave"]):
                     compsave = outputdir + conf["compsave"]
                 else:
                     compsave = conf["compsave"]
-                if conf["compshift"] == '' or conf["compshift"] == 'None':
+                if "compshift" not in conf.keys():
+                    compshift = None
+                elif conf["compshift"] in ['','None','none','False','false']:
                     compshift = None
                 else:
                     compshift = np.array([float(val) 
                                           for val in conf["compshift"].split()])
                 # Load posterior and stack chains
                 cpost  = np.load(compfile)
-                cstack = cpost[0, :, burnin:]
+                cstack = cpost[0, :, compburn:]
                 for c in np.arange(1, cpost.shape[0]):
-                    cstack = np.hstack((cstack, cpost[c, :, burnin:]))
+                    cstack = np.hstack((cstack, cpost[c, :, compburn:]))
                 if compshift is not None:
                     cstack += np.expand_dims(compshift, -1)
                 # Make comparison plot
                 C.comp_histogram(outp, cstack, 
                                  'HOMER', compname, 
-                                 pnames, 
-                                 savefile=compsave+'_hist.png')
+                                 np.asarray(pnames)[pstep>0], 
+                                 savefile=compsave+"_hist"+fext)
                 print('Bhattacharyya coefficients:')
                 bhatchar = np.zeros(sum(pstep>0))
                 for n in range(sum(pstep>0)):
@@ -641,12 +684,26 @@ def HOMER(cfile):
                 print('  '+'Mean'.ljust(pnlen, ' ')+':', np.mean(bhatchar))
                 np.save(outputdir+'bhatchar.npy', bhatchar)
                 if plot_PT:
-                    C.comp_PT(pressure, outp[:5], cstack[:5], 'HOMER', compname,
-                              PTargs, savefile=compsave+'_PT.png')
+                    if 'cinit' not in conf.keys() and \
+                       np.amin(np.arange(len(pinit))[pstep<=0]) < nPT:
+                        print("To plot a comparison of T(p) posteriors with " +\
+                              "fixed values, `cinit` must be\n"   +\
+                              "specified in the configuration file.")
+                    elif len(istep) == nPT:
+                        # No fixed T(p) parameters
+                        C.comp_PT(pressure, presspost, cstack[:nPT], 'HOMER', 
+                                  compname, PTargs, savefile=compsave+"_PT"+fext)
+                    else:
+                        cinit = np.array([float(val) for val in conf["cinit"].split()])
+                        cprespost = np.zeros((nPT, cstack.shape[-1]))
+                        cprespost[ifixd] = cinit [ifixd]
+                        cprespost[istep] = cstack[istep]
+                        C.comp_PT(pressure, presspost, cprespost, 'HOMER', 
+                                  compname, PTargs, savefile=compsave+"_PT"+fext)
                 C.comp_pairwise(outp, cstack, 
                                 'HOMER', compname, 
-                                pnames, 
-                                savefile=compsave+'_pair.png')
+                                np.asarray(pnames)[pstep>0], 
+                                savefile=compsave+"_pair"+fext)
 
     return
 

@@ -150,7 +150,7 @@ def comp_pairwise(stack1, stack2, name1, name2,
     palette2.set_bad(alpha=0.0)
 
     # Make the figure, then plot
-    fig = plt.figure(fignum, figsize=(8,8))
+    fig = plt.figure(fignum, figsize=(1.5*npars, 1.5*npars))
     plt.clf()
     h = 1 # Subplot index
     plt.subplots_adjust(left  =0.15, right =0.85, bottom=0.15, top=0.85,
