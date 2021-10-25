@@ -20,7 +20,7 @@ import utils as U
 def eval(params, nn, 
          x_mean, x_std, y_mean, y_std, 
          x_min,  x_max, y_min,  y_max, scalelims, 
-         wavenum=None, 
+         xvals=None, 
          starspec=None, factor=None, 
          filters=None, ifilt=None, 
          ilog=False, olog=False, 

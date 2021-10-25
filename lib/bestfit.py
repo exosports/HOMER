@@ -59,6 +59,8 @@ def plot_bestfit(outputdir, xvals, data, uncert, meanwave, ifilt, bestfit,
         hi3    = kll.get_quantiles(0.9986)[:, 0]
 
     # Set up the x-axis error array
+    if meanwave is None:
+        meanwave = xvals
     if ifilt is None:
         xerr = np.zeros((2, len(xvals)))
         xerr[0, 1:  ] = np.abs(xvals[1:  ] - xvals[ :-1])/2

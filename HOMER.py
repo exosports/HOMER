@@ -450,6 +450,7 @@ def HOMER(cfile):
                 ifilt    = None
                 filttran = None
                 meanwave = None
+                xwn      = xvals
 
             ### Check if datasketches is available ###
             if ds and quantiles:
@@ -573,7 +574,6 @@ def HOMER(cfile):
                             bestfit, xlabel, ylabel, kll=kll, 
                             bestpars=bestp, truepars=truepars, 
                             title=title, ndec=ndec, fext=fext)
-            sys.exit()
 
             # Shift posterior params, if needed (e.g., for units)
             if postshift is not None:
