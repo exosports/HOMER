@@ -1,0 +1,31 @@
+This directory contains files that will demonstrate HOMER using various 
+samplers.  
+
+Configuration files take the name format of 
+    config_<sampler>.cfg
+
+Note that the parameters differ between the MCMC-based (demc, snooker) and 
+nested sampling-based (multinest, ultranest) configurations.
+For details on each parameter of the configuration file, see the user manual.
+
+The necessary input files are located in the appropriately named subdirectory, 
+inputs.  Here is a description of each file:
+data_case0_unc01.npy -- the data we are fitting.
+datmax.npy -- NN training set maxima, for each input and output parameter
+datmin.npy -- as above,  but  minima
+filters/ -- directory holding the filter files.  Each define which channels of 
+            the NN output correspond to a certain data point.
+make_filters.py -- code used to produce the filters.
+mcmc_func.py -- contains functions to be evaluated at each MCMC iteration
+mean.npy -- Like the maxima/minima files, but the mean.
+multinest_func.py -- input functions for the MultiNest sampler.
+stdev.npy -- Like the maxima/minima/mean files, but the standard deviation.
+ultranest_func.py -- input functions for the UltraNest sampler.
+uncert_case0_unc01.npy -- the uncertainty on each data point.
+xvals_binned46.npy -- xvals.npy, but at the resolution of the inference.  
+                      See make_filters.py.
+xvals.npy -- the X-axis values that correspond to each NN output.
+
+To run a given config,
+    path/to/HOMER.py config_<sampler>.cfg
+
