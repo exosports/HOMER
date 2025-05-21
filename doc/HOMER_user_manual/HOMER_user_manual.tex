@@ -1,0 +1,455 @@
+% HOMER User Manual
+%
+% Please note this document will be automatically compiled and hosted online
+% after each commit to master. Because of this, renaming or moving the
+% document should be done carefully. To see the compiled document, go to
+% https://exosports.github.io/HOMER/doc/HOMER_User_Manual.html
+
+\documentclass[letterpaper, 12pt]{article}
+\input{top-HOMER_user_manual}
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+
+\textsc{\LARGE University of Central Florida}\\[1.5cm]
+
+% Title
+\rule{\linewidth}{0.5mm} \\[0.4cm]
+{ \huge \bfseries HOMER Users Manual \\[0.4cm] }
+\rule{\linewidth}{0.5mm} \\[1.0cm]
+
+\textsc{\Large Helper Of My Eternal Retrievals}\\[1.5cm]
+
+% Author and supervisor
+\noindent
+\begin{minipage}{0.4\textwidth}
+\begin{flushleft}
+\large
+\emph{Authors:} \\
+Michael D. \textsc{Himes} \\
+\end{flushleft}
+\end{minipage}%
+\begin{minipage}{0.4\textwidth}
+\begin{flushright} \large
+\emph{Supervisor:} \\
+Dr.~Joseph \textsc{Harrington}
+\end{flushright}
+\end{minipage}
+\vfill
+
+% Bottom of the page
+{\large \today}
+
+\end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Team Members}
+\label{sec:team}
+
+\begin{itemize}
+\item \href{https://github.com/mdhimes/}{Michael Himes}%
+  \footnote{https://github.com/mdhimes/}, University of
+  Central Florida (mhimes@knights.ucf.edu)
+\item Joseph Harrington, University of Central Florida
+\item David C. Wright, University of Central Florida
+\item Zacchaeus Scheffer, University of Central Florida
+\end{itemize}
+
+\section{Introduction}
+\label{sec:theory}
+
+\noindent This document describes HOMER, the Helper Of My Eternal Retrievals. 
+HOMER is a Bayesian inverse modeling code.  Given some data and 
+uncertainties, the posterior distribution is determined for some model. 
+While normal Bayesian modeling codes utilize some numerical forward model 
+that implements the known process (e.g., radiative transfer for planetary 
+atmospheres), HOMER uses a neural network (NN) approximation of the forward 
+process, such as that trained by MARGE.  HOMER uses the Large-selection 
+Interface for Sampling Algorithms (LISA) for Markov Chain Monte Carlo (MCMC) 
+and nested sampling (NS) Bayesian frameworks.
+
+The detailed HOMER code documentation and User Manual
+\footnote{Most recent version of the manual available at 
+\href{https://exosports.github.io/HOMER/doc/HOMER_User_Manual.html}{https://exosports.github.io/HOMER/doc/HOMER\_User\_Manual.html}} 
+are provided with the package to assist users in its usage. 
+For additional support, contact the lead author (see Section \ref{sec:team}).
+
+HOMER is released under the Reproducible Research Software License.  
+For details, see \\
+\href{https://planets.ucf.edu/resources/reproducible-research/software-license/}{https://planets.ucf.edu/resources/reproducible-research/software-license/}.
+\newline
+
+\noindent The HOMER package is organized as follows: \newline
+% The framebox and minipage are necessary because dirtree kills the
+% indentation.
+\noindent\framebox{\begin{minipage}[t]{0.97\columnwidth}%
+\dirtree{%
+ .1 HOMER. 
+ .2 doc.
+ .2 example.
+ .2 lib. 
+ .2 modules. 
+ .3 datasketches.
+ .3 LISA. 
+}
+\end{minipage}}
+\vspace{0.7cm}
+% \newline is not working here, therefore I use vspace.
+% (because dirtree is such a pain in the ass)
+
+\section{Installation}
+\label{sec:installation}
+
+\subsection{System Requirements}
+\label{sec:requirements}
+
+\noindent HOMER was developed on a Linux machine using the following 
+versions of packages:
+
+\begin{itemize}
+\item Python 3.7.2
+\item Keras 2.2.4
+\item Numpy 1.16.2
+\item Matplotlib 3.0.2
+\item Scipy 1.2.1
+\item sklearn 0.20.2
+\item Tensorflow 1.13.1
+\item CUDA 9.1.85
+\item cuDNN 7.5.00
+\item pymultinest 2.10
+\item ultranest 2.2.2
+\end{itemize}
+
+
+\noindent If installing the Datasketches library, CMake 3.12.0+ is required.
+
+
+
+\subsection{Install and Compile}
+\label{sec:install}
+
+\noindent To begin, obtain the latest stable version of HOMER.  
+
+\noindent First, decide on a local directory to hold HOMER.  Let the path to this directory 
+be `HOMER'.  Now, clone the repository:
+\begin{verbatim}
+git clone --recursive https://github.com/exosports/HOMER HOMER/
+cd HOMER/
+\end{verbatim}
+
+\noindent HOMER contains a file to easily build a conda environment capable of 
+executing the software.  Create the environment via
+
+\begin{verbatim}
+conda env create -f environment.yml
+\end{verbatim}
+
+\noindent Then, activate the environment:
+
+\begin{verbatim}
+conda activate marge_homer
+\end{verbatim}
+
+\noindent Now, build the submodules:
+
+\begin{verbatim}
+make all
+\end{verbatim}
+
+\noindent The Datasketches library is optional.  If you do not want to install it, do 
+\begin{verbatim}
+make mccubed
+\end{verbatim}
+\noindent instead of `make all'.
+
+\noindent You are now ready to run HOMER.
+
+
+\section{Example}
+\label{sec:example}
+
+The following script will walk a user through using HOMER for a retrieval on 
+HD 189733 b, following from MARGE's example which trains an NN model for RT. 
+These instructions are meant to be executed from a Linux terminal.  
+The requirements for this example are less than the requirements for MARGE's 
+example.  Since MARGE's example is required to execute this example, we do 
+not explicitly list all system requirements.  Ensure you have at least 1 GB of 
+free space before beginning.
+
+\noindent To begin, copy the requisite files to a directory parallel to HOMER. 
+Beginning from HOMER/, 
+\begin{verbatim}
+mkdir ../run
+cp -a ./example/* ../run/.
+cd ../run
+\end{verbatim}
+\noindent Note that, if the user is running this following the MARGE example, 
+the `run' directory should contain all of the files from both examples.
+
+\noindent Now, execute HOMER for the desired sampler(s):
+
+\begin{verbatim}
+../HOMER/HOMER.py config_demc.cfg
+../HOMER/HOMER.py config_snooker.cfg
+../HOMER/HOMER.py config_multinest.cfg
+../HOMER/HOMER.py config_ultranest.cfg
+\end{verbatim}
+
+
+\section{Program Inputs}
+\label{sec:inputs}
+
+The executable HOMER.py is the driver for the HOMER program. It takes a 
+a configuration file of parameters.  Once configured, HOMER is executed via 
+the terminal as described in Section \ref{sec:example}.
+
+
+\subsection{HOMER Configuration File}
+\label{sec:config}
+The HOMER configuration file is the main file that sets the arguments for a 
+HOMER run. The arguments follow the format {\ttb argument = value}, where 
+{\ttb argument} is any of the possible arguments described below. 
+
+\noindent The available options for a HOMER configuration file are listed below.
+
+\noindent \underline(Directories)
+\begin{itemize}
+\item inputdir   : str.  Directory containing HOMER inputs.
+\item outputdir  : str.  Directory containing HOMER outputs.
+\end{itemize}
+
+\noindent \underline{Run Parameters}
+\begin{itemize}
+\item quantiles   : bool. Determines whether to compute spectra quantiles.
+                    If the Datasketches library is not install, this setting 
+                    has no effect.
+\item onlyplot    : bool. Determines whether to skip the inference.
+                    Reproduces plots related to posterior.
+\item plot\_PT    : bool. Determines whether to compute the explored 
+                    pressure--temperature profiles using the formulation of 
+                    Line et al. (2013).  Presently, this requires the model 
+                    parameters to be ordered as 
+                    log(kappa), log(gamma1), log(gamma2), alpha, beta, 
+                    followed by any other parameters.
+\item credregion  : bool. Determines whether to calculate the 68, 95, and 99\% 
+                    credible regions \& uncertainties.
+\end{itemize}
+
+
+\noindent \underline{Data Normalization Parameters}
+\begin{itemize}
+\item ilog        : bool. Determines whether the NN takes the logarithm of the 
+                          inputs.
+                          Alternatively, specify comma-, space-, or newline-separated 
+                          integers to selectively take the log of certain inputs.
+\item olog        : bool. Determines whether the NN predicts the log of the 
+                          outputs.
+                          Alternatively, specify comma-, space-, or newline-separated 
+                          integers to selectively take the log of certain outputs.
+\item normalize   : bool. Determines whether to standardize the data by its 
+                          mean and standard deviation.
+\item scale       : bool. Determines whether to scale the data to be within a 
+                          range.
+\item scalelims   : ints. Range to scale the data to.
+                          Format: low, high
+\item fmean       : str.  Path to .NPY file of mean training input and output 
+                          values.
+                          Format: [inp0, inp1, ..., outp0, outp1, ...]
+                          If relative path, assumed to be with respect to the 
+                          input directory.
+\item fstdev      : str.  Path to .NPY file of standard deviation of 
+                          inputs/outputs.
+                          See `fmean` for format \& path description.
+\item fmin        : str.  Path to .NPY file of minima of inputs/outputs.
+                          See `fmean` for format \& path description.
+\item fmax        : str.  Path to .NPY file of maxima of inputs/outputs.
+                          See `fmean` for format \& path description.
+\end{itemize}
+
+
+\noindent \underline{Neural Network (NN) Parameters}
+\begin{itemize}
+\item weight\_file: str.  File containing NN model and weights.
+                    NOTE: MUST end in .h5
+\item inD  : int.  Dimensionality of the input  to the NN.
+\item outD : int.  Dimensionality of the output of the NN.
+\end{itemize}
+
+\noindent \underline{Bayesian Sampler Parameters}
+\begin{itemize}
+\item alg   : str.  Bayesian sampling algorithm.  Options:
+                      demc                 (ter Braak 2006)
+                      snooker     (ter Braak \& Vrugt 2008)
+                      multinest         (Feroz et al. 2008)
+                      ultranest              (Buchner 2014, 2016, 2019)
+\item func  : strs. Function and file to evaluate at each iteration of 
+                    the MCMC.
+                    Format: 
+                      function file
+                    or, if the file is in a different directory,
+                      function file path/to/file/
+                    Note: omit the '.py' from `file`.
+\item pnames: strs. Name of each free parameter. Can include LaTeX 
+                    formatting.
+\item pinit : floats. Initial parameters for the MCMC.
+\item pmin  : floats. Minima for free parameters.
+\item pmax  : floats. Maxima for free parameters.
+\item pstep : floats. Step size for free parameters. 
+                      This will change throughout the MCMC due to the 
+                      differential evolution algorithm used.
+\item data  : floats. Values to be fit via MCMC. 
+                    Format: Separate each value by an indented newline.
+                    Alternatively, specify a .NPY file.
+\item uncert: floats. Uncertainties on values to be fit via MCMC. 
+                      Same format (indented newlines or .NPY)
+\end{itemize}
+
+
+\noindent \underline{Additional Sampler Parameters}
+Only required if your setup requires the parameter.
+
+\begin{itemize}
+\item filters     : strs. Paths to filter bandpasses associated with each datum. 
+                    Separate each by indented newlines.
+                    X-axis values must have the same type of units as `xvals`,
+                    but may be separated by a constant multiplicative factor
+                    (e.g., mm vs um, ft vs inch), see `filtconv` argument.
+\item starspec    : str.  Path to .NPY file of the stellar spectrum.
+                    More generally, this is an array of scaling factors that 
+                    can be used when calculating the model.
+\item factor      : str.  Path to .NPY file of scaling factor by which 
+                    to modify de-normalized predictions. 
+                    E.g., unit conversion.
+\item wn          : bool. In astro context, determines whether the X-axis units are 
+                    spatial frequency (True) or wavelength (False).
+                    More generally, when wn = False, the X-axis values are 
+                    transformed to their inverse when plotting and 
+                    band-integrating models.  
+\item wnfact      : float. Multiplication factor when computing the inverse of 
+                     `xvals`.
+                     E.g., if `xvals` is in cm-1 and the desired inverse units 
+                     are um, then wnfact = 1e4.
+\item filtconv    : float. Multiplication factor to convert the filter 
+                     X-value units to the `xvals` units.
+                     E.g., if filter X values are in nm, but `xvals` are in um, 
+                     this argument would be set to 1e-3.
+\end{itemize}
+
+
+\noindent \underline{MCMC Parameters}
+\begin{itemize}
+\item flog        : str.  Path to MCMC log file. 
+                          If relative, with respect to input dir.
+\item nchains     : int.  Number of parallel samplers.
+\item niter       : int.  Number of total iterations.
+\item burnin      : int.  Number of burned iterations from the beginning of 
+                          chains.
+\item thinning    : int.  Thinning factor for the posterior (keep every N iterations). Example: a thinning factor of 3 will keep every third iteration.  Only recommended when the computed posterior is extremely large; not recommended for any nested sampling algorithms.  Default: 1
+\end{itemize}
+
+\noindent \underline{Plotting Parameters}
+\begin{itemize}
+\item xvals      : str.  Path to .NPY file containing the x-axis values 
+                         associated with a prediction.
+                         If relative, path is with respect to `inputdir`.
+\item xlabel     : str.  X-axis label for plots.
+\item ylabel     : str.  Y-axis label for plots.
+\item fpress     : str.  Path to text file containing the pressures of each 
+                         layer of the atmosphere, for plotting T(p) profiles.
+                         If relative, with respect to `inputdir`.
+                         If plot\_PT is False, this argument does nothing.
+\item PTargs     : str.  Path to .txt file containing values necessary to 
+                   calculate the temperature--pressure profile.
+                   Currently, only option is Line et al. (2013) method.
+                   Format: R\_star (m), T\_star (K), T\_int (K), 
+                           sma (m), grav (cm s-2)
+                   If plot\_PT is False, this argument does nothing.
+\item truepars   : floats.  The true values of the model parameters to be 
+                         retrieved.  If unknown (e.g., real observational data),
+                         omit this key, or set it to None or False.
+                         Format: values separated by spaces or newlines, or 
+                                 a .NPY file containing the values.
+\item postshift   : floats. Shifts all values of a particular parameter by a 
+                          set amount in the posterior to be compared, such as 
+                          for factor-of-10 unit conversions in a log space.
+                    E.g., postshift = 1 0 0 would increase all of the first 
+                    parameter's values by 1 and leave the other parameters 
+                    alone.
+                    Format: val1 val2 val3 val4 ...
+\item savefile   : str.  (optional) Prefix for MCMC plots to be saved.
+\end{itemize}
+
+\noindent \underline{Comparing Posteriors (optional)}
+\begin{itemize}
+\item compost     : bool. Determines whether to compare HOMER's posterior to 
+                          another.
+\item compfile    : str.  Path to posterior .NPY file to compare with HOMER.
+\item compname    : str.  Name of the other posterior for plot legends.
+\item compsave    : str.  File name prefix for the saved comparison plots.
+\item compshift   : floats. Same as `postshift`, but for the posterior being 
+                          compared.
+\item cinit       : floats. Same as `pinit`, but for the posterior being 
+                          compared.
+                          Only required if `plot\_PT` is True and one or more 
+                          of the T(p) parameters are held fixed.
+\end{itemize}
+
+
+\section{Program Outputs}
+\label{sec:outputs}
+
+HOMER produces the following outputs:
+
+\begin{itemize}
+\item MCMC.log -- (MCMC only) a record of the MCMC exploration, including SPEIS, ESS, and 
+                  credible regions.
+\item output.npy -- the posterior determined by the Bayesian sampler
+\item Posterior plots -- pairwise, posterior, PT (if `plot\_PT`), and trace plots.
+\item comparison plots -- if `compost`, makes overplots of the 1D marginalized 
+                          posteriors, 2D pairwise posteriors, and explored 
+                          temperature--presure profiles.
+\item bhatchar.npy -- if `compost`, calculates the Bhattacharyya coefficients 
+                      between HOMER's posterior and the other specified 
+                      posterior.
+\end{itemize}
+
+
+
+\section{Be Kind}
+\label{sec:bekind}
+Please cite this paper if you found this package useful for your research:
+
+\href{https://iopscience.iop.org/article/10.3847/PSJ/abe3fd/meta}{Himes et al. 2022, PSJ, 3, 91}
+
+\begin{verbatim}
+@ARTICLE{2022PSJ.....3...91H,
+       author = {{Himes}, Michael D. and {Harrington}, Joseph and {Cobb}, Adam D. and {G{\"u}ne{\c{s}} Baydin}, At{\i}l{\i}m and {Soboczenski}, Frank and {O'Beirne}, Molly D. and {Zorzan}, Simone and {Wright}, David C. and {Scheffer}, Zacchaeus and {Domagal-Goldman}, Shawn D. and {Arney}, Giada N.},
+        title = "{Accurate Machine-learning Atmospheric Retrieval via a Neural-network Surrogate Model for Radiative Transfer}",
+      journal = {\psj},
+     keywords = {Exoplanet atmospheres, Bayesian statistics, Posterior distribution, Convolutional neural networks, Neural networks, 487, 1900, 1926, 1938, 1933},
+         year = 2022,
+        month = apr,
+       volume = {3},
+       number = {4},
+          eid = {91},
+        pages = {91},
+          doi = {10.3847/PSJ/abe3fd},
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2022PSJ.....3...91H},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+}
+\end{verbatim}
+
+\noindent Thanks!
+
+% \section{Further Reading}
+% \label{sec:furtherreading}
+
+% TBD: Add papers here.
+
+
+\end{document}
