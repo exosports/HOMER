@@ -435,7 +435,7 @@ def HOMER(cfile):
                                               bounds_error=False, fill_value=0)
                     # Interpolate and normalize
                     tranfilt = finterp(xwn)
-                    tranfilt = tranfilt / np.trapz(tranfilt, xwn)
+                    tranfilt = tranfilt / np.abs(np.trapz(tranfilt, xwn))
                     meanwn.append(np.sum(xwn*tranfilt)/sum(tranfilt))
                     # Find non-zero indices for faster integration
                     nonzero = np.where(tranfilt!=0)
